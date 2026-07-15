@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}{{ audio.name }} — VoiceAdmin{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary btn-sm">&larr; Back</a>
+    <h4 class="mb-0 text-truncate">{{ audio.name }}</h4>
+</div>
+
+<div class="row g-4">
+    <!-- Player + rename -->
+    <div class="col-lg-7">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h6 class="text-muted text-uppercase small mb-3">Preview</h6>
+                <audio controls preload="none" class="w-100">
+                    <source src="{% url 'audio_stream' audio.pk %}" type="audio/mpeg">
+                    Your browser does not support audio playback.
+                </audio>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="text-muted text-uppercase small mb-3">Rename</h6>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="input-group">
+                        <input type="text" name="name" value="{{ audio.name }}" class="form-control" maxlength="255" required>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Details + actions -->
+    <div class="col-lg-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-body p-4">
+                <h6 class="text-muted text-uppercase small mb-3">Details</h6>
+                <dl class="row mb-0 small">
+                    <dt class="col-5 text-muted fw-normal">File SID</dt>
+                    <dd class="col-7">
+                        <div class="d-flex align-items-center gap-2">
+                            <code id="fileSid" class="text-truncate">{{ audio.file_sid }}</code>
+                            <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1"
+                                    onclick="copySid()" title="Copy">Copy</button>
+                        </div>
+                    </dd>
+
+                    <dt class="col-5 text-muted fw-normal mt-2">Size</dt>
+                    <dd class="col-7 mt-2">{{ audio.size_bytes|filesizeformat }}</dd>
+
+                    <dt class="col-5 text-muted fw-normal mt-2">Uploaded</dt>
+                    <dd class="col-7 mt-2">{{ audio.uploaded_at|date:"M j, Y, g:i a" }}</dd>
+
+                    <dt class="col-5 text-muted fw-normal mt-2">Container</dt>
+                    <dd class="col-7 mt-2"><code class="text-truncate d-block">{{ audio.container_sid }}</code></dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'audio_download' audio.pk %}" class="btn btn-outline-secondary">Download</a>
+            <form method="post" action="{% url 'audio_delete' audio.pk %}"
+                  onsubmit="return confirm('Delete &quot;{{ audio.name }}&quot;? This cannot be undone.')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function copySid() {
+        const sid = document.getElementById('fileSid').textContent.trim();
+        navigator.clipboard.writeText(sid);
+    }
+</script>
+{% endblock %}

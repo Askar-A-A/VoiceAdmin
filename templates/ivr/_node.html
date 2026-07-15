@@ -1,0 +1,36 @@
+<li>
+    <div class="ivr-node">
+        <span class="ivr-key {% if node.is_root %}root{% endif %}">
+            {% if node.is_root %}MAIN{% else %}{{ node.key }}{% endif %}
+        </span>
+
+        <div class="ivr-meta">
+            <div class="fw-medium">{{ node.name }}</div>
+            <div class="small text-muted">
+                {{ node.get_menu_type_display }}
+                {% if node.greeting %} · 🔊 {{ node.greeting.name }}{% else %} · <span class="text-warning-emphasis">no greeting</span>{% endif %}
+                {% if node.menu_type == 'dial_out' and node.dial_out_number %} · → {{ node.dial_out_number }}{% endif %}
+            </div>
+        </div>
+
+        <div class="ivr-actions d-flex gap-1">
+            <a href="{% url 'menu_create' node.pk %}" class="btn btn-outline-primary btn-sm">+ Sub-menu</a>
+            <a href="{% url 'menu_edit' node.pk %}" class="btn btn-outline-secondary btn-sm">Edit</a>
+            {% if not node.is_root %}
+            <form method="post" action="{% url 'menu_delete' node.pk %}"
+                  onsubmit="return confirm('Delete &quot;{{ node.name }}&quot; and everything under it?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if node.children.all %}
+    <ul>
+        {% for child in node.children.all %}
+            {% include 'ivr/_node.html' with node=child %}
+        {% endfor %}
+    </ul>
+    {% endif %}
+</li>

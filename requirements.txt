@@ -1,0 +1,5 @@
+django>=5.1,<6.0
+psycopg2-binary>=2.9
+python-decouple>=3.8
+dj-database-url>=3.0
+requests>=2.31

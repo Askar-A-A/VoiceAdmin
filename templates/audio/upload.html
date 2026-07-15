@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Upload audio — VoiceAdmin{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary btn-sm">&larr; Back</a>
+            <h4 class="mb-0">Upload audio files</h4>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <div id="dropzone" class="text-center p-5 mb-3"
+                     style="border: 2px dashed #ced4da; border-radius: 0.5rem; cursor: pointer; transition: all 0.15s;">
+                    <div class="fs-1 mb-2">⬆️</div>
+                    <p class="mb-1 fw-semibold">Drag &amp; drop audio files here</p>
+                    <p class="text-muted small mb-0">or click to browse — multiple files supported</p>
+                </div>
+                <input type="file" id="fileInput" accept="audio/*" multiple hidden>
+
+                <div id="uploadList"></div>
+
+                <div id="doneBox" class="text-center mt-3" hidden>
+                    <a href="{% url 'audio_list' %}" class="btn btn-primary">View all files</a>
+                </div>
+            </div>
+        </div>
+        <p class="text-muted small mt-2">Maximum file size: 50 MB per file.</p>
+    </div>
+</div>
+
+<script>
+(function () {
+    const csrftoken = '{{ csrf_token }}';
+    const uploadUrl = "{% url 'audio_upload_ajax' %}";
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadList = document.getElementById('uploadList');
+    const doneBox = document.getElementById('doneBox');
+    let pending = 0;
+
+    dropzone.addEventListener('click', () => fileInput.click());
+
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = '#0d6efd';
+        dropzone.style.backgroundColor = '#f8f9ff';
+    });
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.style.borderColor = '#ced4da';
+        dropzone.style.backgroundColor = '';
+    });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.style.borderColor = '#ced4da';
+        dropzone.style.backgroundColor = '';
+        handleFiles(e.dataTransfer.files);
+    });
+
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    function handleFiles(files) {
+        for (const file of files) {
+            uploadFile(file);
+        }
+    }
+
+    function uploadFile(file) {
+        pending++;
+        doneBox.hidden = true;
+
+        const row = document.createElement('div');
+        row.className = 'mb-3';
+        row.innerHTML = `
+            <div class="d-flex justify-content-between small mb-1">
+                <span class="text-truncate" style="max-width: 75%;">${escapeHtml(file.name)}</span>
+                <span class="status text-muted">0%</span>
+            </div>
+            <div class="progress" style="height: 6px;">
+                <div class="progress-bar" role="progressbar" style="width: 0%;"></div>
+            </div>`;
+        uploadList.appendChild(row);
+
+        const bar = row.querySelector('.progress-bar');
+        const status = row.querySelector('.status');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', uploadUrl);
+        xhr.setRequestHeader('X-CSRFToken', csrftoken);
+
+        xhr.upload.addEventListener('progress', (e) => {
+            if (e.lengthComputable) {
+                const pct = Math.round((e.loaded / e.total) * 100);
+                bar.style.width = pct + '%';
+                status.textContent = pct < 100 ? pct + '%' : 'Processing…';
+            }
+        });
+
+        xhr.addEventListener('load', () => {
+            let ok = false, msg = 'Failed';
+            try {
+                const res = JSON.parse(xhr.responseText);
+                ok = res.success;
+                if (!ok) msg = res.error || 'Failed';
+            } catch (_) {}
+            if (ok) {
+                bar.classList.add('bg-success');
+                bar.style.width = '100%';
+                status.textContent = '✓ Uploaded';
+                status.className = 'status text-success';
+            } else {
+                bar.classList.add('bg-danger');
+                status.textContent = '✕ ' + msg;
+                status.className = 'status text-danger';
+            }
+            finish();
+        });
+
+        xhr.addEventListener('error', () => {
+            bar.classList.add('bg-danger');
+            status.textContent = '✕ Network error';
+            status.className = 'status text-danger';
+            finish();
+        });
+
+        xhr.send(formData);
+    }
+
+    function finish() {
+        pending--;
+        if (pending === 0) doneBox.hidden = false;
+    }
+
+    function escapeHtml(s) {
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+})();
+</script>
+{% endblock %}

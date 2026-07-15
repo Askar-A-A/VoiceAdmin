@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}Phone menu — VoiceAdmin{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="mb-1">Phone menu</h4>
+    <p class="text-muted mb-0">
+        Build the menu callers hear. Each entry plays a greeting and is reached by a keypad press
+        from the menu above it.
+    </p>
+</div>
+
+<div class="card shadow-sm mb-4 border-primary-subtle">
+    <div class="card-body p-4">
+        <h6 class="text-muted text-uppercase small mb-3">Your phone line</h6>
+        <form method="post" action="{% url 'set_phone_number' %}" class="row g-2 align-items-end">
+            {% csrf_token %}
+            <div class="col-md-7">
+                <label class="form-label">Your phone number</label>
+                {% if numbers %}
+                <select name="phone_number" class="form-select">
+                    <option value="">— Select a number —</option>
+                    {% for n in numbers %}
+                    <option value="{{ n }}" {% if n == config.phone_number %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <input type="text" name="phone_number" value="{{ config.phone_number }}"
+                       class="form-control" placeholder="+1 484 968 7622">
+                {% endif %}
+                <div class="form-text">Callers dial this number and go straight to your menu — no access code needed.</div>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary">Save number</button>
+            </div>
+        </form>
+        {% if not config.phone_number %}
+        <div class="small text-muted mt-3">
+            No number set yet. Until you add one, callers can still reach you on the shared number
+            using access code <strong>{{ config.access_code }}</strong>.
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-4">
+        <ul class="ivr-tree list-unstyled mb-0">
+            {% include 'ivr/_node.html' with node=root %}
+        </ul>
+    </div>
+</div>
+
+<style>
+    .ivr-tree, .ivr-tree ul { list-style: none; }
+    .ivr-tree ul { margin-left: 1.25rem; padding-left: 1rem; border-left: 2px solid #e9ecef; }
+    .ivr-node {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #e9ecef;
+        border-radius: 0.5rem;
+        margin-bottom: 0.5rem;
+        background: #fff;
+    }
+    .ivr-key {
+        flex: 0 0 auto;
+        width: 32px; height: 32px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 0.375rem;
+        background: #0d6efd; color: #fff; font-weight: 600;
+    }
+    .ivr-key.root { background: #198754; font-size: 0.7rem; }
+    .ivr-meta { flex-grow: 1; min-width: 0; }
+    .ivr-actions { flex: 0 0 auto; }
+</style>
+{% endblock %}

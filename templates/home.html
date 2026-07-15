@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}VoiceAdmin — Self-service voice & IVR management{% endblock %}
+
+{% block content %}
+<div class="px-3 d-flex flex-column justify-content-center" style="min-height: calc(100vh - 56px - 3.5rem - 12vh); padding-bottom: 12vh;">
+    <!-- Hero -->
+    <div class="text-center py-5">
+        <h1 class="display-6 fw-bold mb-3">Your phone system, managed from the browser</h1>
+        <p class="text-muted mb-4 mx-auto" style="max-width: 520px;">
+            Upload audio, build phone menus, and manage your voice content yourself.
+        </p>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="{% url 'register' %}" class="btn btn-primary btn-lg">Get started</a>
+            <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-lg">Sign in</a>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="row g-4 py-4 justify-content-center">
+        <div class="col-md-4">
+            <div class="text-center px-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                     fill="none" stroke="#495057" stroke-width="1.5" stroke-linecap="round"
+                     stroke-linejoin="round" class="mb-3">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <h6 class="mb-2">Upload audio</h6>
+                <p class="text-muted small mb-0">Drag and drop your greetings and prompts.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="text-center px-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                     fill="none" stroke="#495057" stroke-width="1.5" stroke-linecap="round"
+                     stroke-linejoin="round" class="mb-3">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0 1 22 16.92z"></path>
+                </svg>
+                <h6 class="mb-2">Build your menu</h6>
+                <p class="text-muted small mb-0">Map keypad presses to actions.</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="text-center px-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+                     fill="none" stroke="#495057" stroke-width="1.5" stroke-linecap="round"
+                     stroke-linejoin="round" class="mb-3">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <line x1="1" y1="14" x2="7" y2="14"></line>
+                    <line x1="9" y1="8" x2="15" y2="8"></line>
+                    <line x1="17" y1="16" x2="23" y2="16"></line>
+                </svg>
+                <h6 class="mb-2">Manage anywhere</h6>
+                <p class="text-muted small mb-0">Update from the web or your phone.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

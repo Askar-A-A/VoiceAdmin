@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+{% block title %}Account settings — VoiceAdmin{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">Account settings</h4>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+        <h6 class="mb-3">Account overview</h6>
+        <div class="row text-center">
+            <div class="col-md-3 col-6 mb-3 mb-md-0">
+                <div class="text-muted small text-uppercase">Email</div>
+                <div class="fw-semibold text-truncate">{{ user.email }}</div>
+            </div>
+            <div class="col-md-3 col-6 mb-3 mb-md-0">
+                <div class="text-muted small text-uppercase">Member since</div>
+                <div class="fw-semibold">{{ user.date_joined|date:"M j, Y" }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="text-muted small text-uppercase">Files</div>
+                <div class="fw-semibold">{{ file_count }}</div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="text-muted small text-uppercase">Storage used</div>
+                <div class="fw-semibold">{{ total_bytes|filesizeformat }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="mb-3">Profile</h6>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for field in profile_form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                        <div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    <button type="submit" name="update_profile" class="btn btn-primary btn-sm">Save changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h6 class="mb-3">Change password</h6>
+                <form method="post" novalidate>
+                    {% csrf_token %}
+                    {% for field in password_form %}
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                        <div class="text-danger small mt-1">{{ field.errors|join:", " }}</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if password_form.non_field_errors %}
+                    <div class="alert alert-danger py-2 small">{{ password_form.non_field_errors|join:", " }}</div>
+                    {% endif %}
+                    <button type="submit" name="change_password" class="btn btn-primary btn-sm">Change password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

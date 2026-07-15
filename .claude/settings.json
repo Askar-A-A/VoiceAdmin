@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python --version)",
+      "PowerShell(pip --version)",
+      "PowerShell(cd \"c:\\\\Users\\\\Askar\\\\Desktop\\\\Work\\\\VoiceAdmin\"; $env:SECRET_KEY='test-secret-key'; $env:DATABASE_URL='postgres://x:x@localhost/x'; $env:CARRIERX_ACCESS_TOKEN='test'; $env:CARRIERX_CONTAINER_SID='test'; python manage.py check 2>&1)",
+      "WebFetch(domain:simplevoicecenter.com)",
+      "WebFetch(domain:simplevoicebox.com)",
+      "WebSearch",
+      "WebFetch(domain:docs.carrierx.com)",
+      "WebFetch(domain:www.carrierx.com)"
+    ]
+  }
+}
