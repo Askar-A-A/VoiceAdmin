@@ -10,7 +10,6 @@ from .forms import RegisterForm, AccountSettingsForm, PasswordUpdateForm
 
 class RegisterView(View):
     template_name = 'accounts/register.html'
-
     def get(self, request):
         if request.user.is_authenticated:
             return redirect('dashboard')

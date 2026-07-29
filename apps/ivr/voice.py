@@ -66,11 +66,10 @@ def _render_menu(request, menu):
         action = request.build_absolute_uri(reverse('voice_record', args=[menu.pk]))
         return flexml.record(play_url, action)
 
-    # PLAYBACK_ONLY: play the greeting, and if there are sub-menus, gather a digit.
-    if menu.children.exists():
-        action = request.build_absolute_uri(reverse('voice_menu', args=[menu.pk]))
-        return flexml.play_and_gather(play_url, action)
-    return flexml.play_only(play_url)
+    # PLAYBACK_ONLY: play the greeting, then always gather — so the caller can
+    # pick a sub-menu (if any) or press 0 to return to the main menu.
+    action = request.build_absolute_uri(reverse('voice_menu', args=[menu.pk]))
+    return flexml.play_and_gather(play_url, action)
 
 
 def _digits_only(value):
@@ -133,10 +132,19 @@ def menu_input(request, pk):
     """Caller pressed a digit while in menu `pk` — route to the matching child."""
     menu = get_object_or_404(Menu, pk=pk)
     digit = _param(request, 'Digits')
+
+    # An explicit sub-menu mapping always wins.
     child = menu.children.filter(key=digit).first()
     if child:
         return _xml(_render_menu(request, child))
-    # Invalid choice — replay the current menu.
+
+    # 0 returns the caller to the main menu (unless 0 was mapped above).
+    if digit == '0':
+        root = Menu.objects.filter(owner=menu.owner, parent__isnull=True).first()
+        if root:
+            return _xml(_render_menu(request, root))
+
+    # Anything else — replay the current menu.
     return _xml(_render_menu(request, menu))
 
 
