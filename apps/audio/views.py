@@ -7,7 +7,7 @@ from django.views.decorators.http import require_POST
 from django.conf import settings
 from django.db.models import Sum
 from django.views import View
-from .models import AudioFile
+from .models import AudioFile, Folder
 from .forms import AudioUploadForm
 from .services import upload_to_carrierx, delete_from_carrierx, stream_from_carrierx
 
@@ -31,11 +31,22 @@ def dashboard(request):
 
 @login_required
 def audio_list(request):
+    folders = Folder.objects.filter(owner=request.user)
     files = AudioFile.objects.filter(owner=request.user)
 
     q = request.GET.get('q', '').strip()
+    folder_id = request.GET.get('folder')
+    current_folder = None
+
     if q:
+        # Search is global — look across every file, whatever folder it's in.
         files = files.filter(name__icontains=q)
+    elif folder_id:
+        current_folder = get_object_or_404(Folder, pk=folder_id, owner=request.user)
+        files = files.filter(folder=current_folder)
+    else:
+        # Root view: folders (shown separately) plus files not in any folder.
+        files = files.filter(folder__isnull=True)
 
     sort = request.GET.get('sort', '-uploaded_at')
     allowed_sorts = {'name', '-name', 'uploaded_at', '-uploaded_at'}
@@ -45,6 +56,8 @@ def audio_list(request):
 
     return render(request, 'audio/list.html', {
         'files': files,
+        'folders': folders,
+        'current_folder': current_folder,
         'q': q,
         'sort': sort,
     })
@@ -116,7 +129,8 @@ def audio_detail(request, pk):
             messages.success(request, 'File renamed.') 
             return redirect('audio_detail', pk=audio.pk)
         messages.error(request, 'Name cannot be empty.')
-    return render(request, 'audio/detail.html', {'audio': audio})
+    folders = Folder.objects.filter(owner=request.user)
+    return render(request, 'audio/detail.html', {'audio': audio, 'folders': folders})
 
 
 @login_required
@@ -137,6 +151,42 @@ def audio_download(request, pk):
     )
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+@login_required
+@require_POST
+def folder_create(request):
+    name = request.POST.get('name', '').strip()
+    if not name:
+        messages.error(request, 'Folder name cannot be empty.')
+    else:
+        Folder.objects.get_or_create(owner=request.user, name=name)
+        messages.success(request, f'Folder "{name}" created.')
+    return redirect('audio_list')
+
+
+@login_required
+@require_POST
+def folder_delete(request, pk):
+    folder = get_object_or_404(Folder, pk=pk, owner=request.user)
+    name = folder.name
+    folder.delete()  # SET_NULL moves its files back to "All files"
+    messages.success(request, f'Folder "{name}" deleted. Its files moved to All files.')
+    return redirect('audio_list')
+
+
+@login_required
+@require_POST
+def audio_move(request, pk):
+    audio = get_object_or_404(AudioFile, pk=pk, owner=request.user)
+    folder_id = request.POST.get('folder')
+    if folder_id:
+        audio.folder = get_object_or_404(Folder, pk=folder_id, owner=request.user)
+    else:
+        audio.folder = None
+    audio.save(update_fields=['folder'])
+    messages.success(request, 'File moved.')
+    return redirect('audio_detail', pk=audio.pk)
 
 
 @login_required

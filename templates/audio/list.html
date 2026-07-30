@@ -2,20 +2,69 @@
 {% block title %}Audio files — VoiceAdmin{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <h4 class="mb-0">Audio files</h4>
+<div class="mb-3">
+    <h4 class="mb-0">
+        {% if current_folder %}
+        <a href="{% url 'audio_list' %}" class="text-decoration-none text-muted">Audio files</a>
+        <span class="text-muted">/</span> {{ current_folder.name }}
+        {% else %}
+        Audio files
+        {% endif %}
+    </h4>
 </div>
 
 <form method="get" class="mb-3" style="max-width: 360px;">
     <div class="input-group input-group-sm">
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search by name…">
-        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Search all files…">
         <button type="submit" class="btn btn-outline-secondary">Search</button>
         {% if q %}
-        <a href="{% url 'audio_list' %}?sort={{ sort }}" class="btn btn-outline-secondary">Clear</a>
+        <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">Clear</a>
         {% endif %}
     </div>
 </form>
+
+{% if not q and not current_folder %}
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+            <h6 class="mb-0 text-muted text-uppercase small">Folders</h6>
+            <form method="post" action="{% url 'folder_create' %}" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="text" name="name" class="form-control form-control-sm"
+                       placeholder="New folder name" maxlength="100" required style="max-width:180px;">
+                <button type="submit" class="btn btn-primary btn-sm">Create</button>
+            </form>
+        </div>
+
+        {% if folders %}
+        <div class="list-group list-group-flush">
+            {% for folder in folders %}
+            <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                <a href="?folder={{ folder.pk }}" class="text-decoration-none d-flex align-items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                    </svg>
+                    {{ folder.name }} <span class="text-muted small">({{ folder.files.count }})</span>
+                </a>
+                <form method="post" action="{% url 'folder_delete' folder.pk %}"
+                      onsubmit="return confirm('Delete folder &quot;{{ folder.name }}&quot;? Its files move back to All files.')">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted small mb-0">No folders yet. Create one to organize your files.</p>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+{% if current_folder %}
+<a href="{% url 'audio_list' %}" class="btn btn-outline-secondary btn-sm mb-3">&larr; Back to all files</a>
+{% endif %}
 
 {% if files %}
 <div class="card shadow-sm">
@@ -24,14 +73,14 @@
             <thead class="table-light">
                 <tr>
                     <th>
-                        <a href="?q={{ q }}&sort={% if sort == 'name' %}-name{% else %}name{% endif %}"
+                        <a href="?{% if current_folder %}folder={{ current_folder.pk }}&{% endif %}{% if q %}q={{ q }}&{% endif %}sort={% if sort == 'name' %}-name{% else %}name{% endif %}"
                            class="text-decoration-none text-dark">
                             Name{% if sort == 'name' %} ▲{% elif sort == '-name' %} ▼{% endif %}
                         </a>
                     </th>
                     <th>Preview</th>
                     <th>
-                        <a href="?q={{ q }}&sort={% if sort == 'uploaded_at' %}-uploaded_at{% else %}uploaded_at{% endif %}"
+                        <a href="?{% if current_folder %}folder={{ current_folder.pk }}&{% endif %}{% if q %}q={{ q }}&{% endif %}sort={% if sort == 'uploaded_at' %}-uploaded_at{% else %}uploaded_at{% endif %}"
                            class="text-decoration-none text-dark">
                             Uploaded{% if sort == 'uploaded_at' %} ▲{% elif sort == '-uploaded_at' %} ▼{% endif %}
                         </a>
@@ -44,6 +93,9 @@
                 <tr>
                     <td>
                         <a href="{% url 'audio_detail' file.pk %}" class="text-decoration-none fw-medium">{{ file.name }}</a>
+                        {% if file.folder and not current_folder %}
+                        <span class="badge text-bg-light border ms-1">{{ file.folder.name }}</span>
+                        {% endif %}
                         <div class="text-muted small"><code>{{ file.file_sid }}</code></div>
                     </td>
                     <td>
@@ -73,9 +125,13 @@
     <p class="mb-3">No files match "{{ q }}".</p>
     <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary btn-sm">Clear search</a>
 </div>
+{% elif current_folder %}
+<div class="text-center py-5 text-muted">
+    <p class="mb-0">This folder is empty. Open a file and use "Move to folder" to add it here.</p>
+</div>
 {% else %}
 <div class="text-center py-5 text-muted">
-    <p class="mb-3">No audio files yet.</p>
+    <p class="mb-3">No files here yet.</p>
     <a href="{% url 'audio_upload' %}" class="btn btn-primary">Upload your first file</a>
 </div>
 {% endif %}
