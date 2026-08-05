@@ -66,11 +66,14 @@ def _render_menu(request, menu):
         action = request.build_absolute_uri(reverse('voice_record', args=[menu.pk]))
         return flexml.record(play_url, action)
 
-    # PLAYBACK_ONLY: play the greeting, and if there are sub-menus, gather a digit.
-    if menu.children.exists():
-        action = request.build_absolute_uri(reverse('voice_menu', args=[menu.pk]))
-        return flexml.play_and_gather(play_url, action)
-    return flexml.play_only(play_url)
+    """
+       Gather digits regardlessly if menu has children or not, as we need 0 to return back
+       Note from Wiktor: because of only playback the last menu without childs couldnt send
+       digits and so menu_input view didnt get any digits to proccess
+    """
+
+    action = request.build_absolute_uri(reverse('voice_menu', args=[menu.pk]))
+    return flexml.play_and_gather(play_url, action)
 
 
 def _digits_only(value):
@@ -136,6 +139,10 @@ def menu_input(request, pk):
     child = menu.children.filter(key=digit).first()
     if child:
         return _xml(_render_menu(request, child))
+
+    if digit == '0' and menu.parent:
+        return _xml(_render_menu(request, menu.parent))
+
     # Invalid choice — replay the current menu.
     return _xml(_render_menu(request, menu))
 

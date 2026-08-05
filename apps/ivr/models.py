@@ -47,7 +47,7 @@ class Menu(models.Model):
         (DIAL_OUT, 'Dial out / forward'),
     ]
 
-    KEY_CHOICES = [(str(d), str(d)) for d in range(10)] + [('*', '*'), ('#', '#')]
+    KEY_CHOICES = [(str(d), str(d)) for d in range(1, 10)] + [('*', '*'), ('#', '#')]
 
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,

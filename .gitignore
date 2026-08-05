@@ -6,4 +6,5 @@ staticfiles/
 db.sqlite3
 voiceadmin_venv/
 venv/
+env/
 *.log
