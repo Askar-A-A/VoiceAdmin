@@ -5,7 +5,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from app.core.config import settings
 from app.core.security import NotAuthenticated
-from app.routers import accounts, dashboard
+from app.routers import accounts, dashboard, audio, ivr, voice, calls, voicemail
 
 app = FastAPI(title="VoicePortal")
 
@@ -19,8 +19,8 @@ async def _redirect_to_login(request: Request, exc: NotAuthenticated):
     return RedirectResponse("/accounts/login/", status_code=303)
 
 
-app.include_router(accounts.router)
-app.include_router(dashboard.router)
+for module in (accounts, dashboard, audio, ivr, voice, calls, voicemail):
+    app.include_router(module.router)
 
 
 @app.get("/health")

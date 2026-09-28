@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import (
     String, DateTime, ForeignKey, UniqueConstraint, func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -11,6 +11,12 @@ from app.db.base import Base
 PLAYBACK_ONLY = "playback"
 PLAYBACK_AND_RECORD = "playback_record"
 DIAL_OUT = "dial_out"
+
+MENU_TYPE_LABELS = {
+    PLAYBACK_ONLY: "Playback only",
+    PLAYBACK_AND_RECORD: "Playback & record message",
+    DIAL_OUT: "Dial out / forward",
+}
 
 
 class IVRConfig(Base):
@@ -61,9 +67,24 @@ class Menu(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
+    parent: Mapped["Menu | None"] = relationship(
+        "Menu", back_populates="children", remote_side="Menu.id"
+    )
+    children: Mapped[list["Menu"]] = relationship(
+        "Menu",
+        back_populates="parent",
+        order_by="Menu.key",
+        cascade="all, delete-orphan",
+    )
+    greeting = relationship("AudioFile")
+
     def __str__(self) -> str:
         return self.name
 
     @property
     def is_root(self) -> bool:
         return self.parent_id is None
+
+    @property
+    def menu_type_display(self) -> str:
+        return MENU_TYPE_LABELS.get(self.menu_type, self.menu_type)

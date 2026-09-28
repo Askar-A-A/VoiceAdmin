@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}{{ action }} — VoicePortal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="/phone-menu/" class="btn btn-outline-secondary btn-sm">&larr; Back</a>
+            <h4 class="mb-0">{{ action }}</h4>
+        </div>
+
+        {% if parent %}
+        <p class="text-muted">Adding a sub-menu under <strong>{{ parent.name }}</strong>.</p>
+        {% endif %}
+
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <form method="post" novalidate>
+                    {% if not is_root %}
+                    <div class="mb-3">
+                        <label class="form-label" for="id_key">Key</label>
+                        <select name="key" id="id_key" class="form-select">
+                            <option value="">— Select a key —</option>
+                            {% for k in key_choices %}
+                            <option value="{{ k }}" {% if values.key == k %}selected{% endif %}>{{ k }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if errors.key %}<div class="text-danger small mt-1">{{ errors.key }}</div>{% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label" for="id_name">Name</label>
+                        <input type="text" name="name" id="id_name" class="form-control"
+                               placeholder="e.g. Sunday Service" value="{{ values.name }}">
+                        {% if errors.name %}<div class="text-danger small mt-1">{{ errors.name }}</div>{% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="id_menu_type">Menu type</label>
+                        <select name="menu_type" id="id_menu_type" class="form-select">
+                            {% for value, label in menu_type_choices %}
+                            <option value="{{ value }}" {% if values.menu_type == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="id_greeting">Greeting</label>
+                        <select name="greeting" id="id_greeting" class="form-select">
+                            <option value="">— No greeting —</option>
+                            {% for audio in greetings %}
+                            <option value="{{ audio.id }}" {% if values.greeting == audio.id|string %}selected{% endif %}>{{ audio.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="id_dial_out_number">Dial out number</label>
+                        <input type="text" name="dial_out_number" id="id_dial_out_number" class="form-control"
+                               placeholder="+1 555 123 4567" value="{{ values.dial_out_number }}">
+                        {% if errors.dial_out_number %}<div class="text-danger small mt-1">{{ errors.dial_out_number }}</div>{% endif %}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a href="/phone-menu/" class="btn btn-link text-muted">Cancel</a>
+                </form>
+            </div>
+        </div>
+
+        <p class="text-muted small mt-3 mb-0">
+            <strong>Playback only</strong> just plays the greeting.
+            <strong>Playback &amp; record</strong> lets the caller leave a message.
+            <strong>Dial out</strong> forwards the caller to a phone number.
+        </p>
+    </div>
+</div>
+{% endblock %}

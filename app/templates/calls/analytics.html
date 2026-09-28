@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% block title %}Call Analytics — VoicePortal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h4 class="mb-0">Call Analytics</h4>
+        {% if own_number %}
+        <div class="text-muted small">Showing calls to your number: {{ own_number }}</div>
+        {% endif %}
+    </div>
+    <a id="exportCsv" href="#" class="btn btn-outline-secondary btn-sm">Export CSV</a>
+</div>
+
+{% if not own_number %}
+<div class="alert alert-warning">
+    You haven't set "Your phone number" yet, so there's nothing to show here.
+    Go to <a href="/phone-menu/">Phone menu</a> and save a number first.
+</div>
+{% endif %}
+
+<form id="filterForm" class="row g-2 align-items-end mb-4">
+    <div class="col-sm-3 col-md-2">
+        <label class="form-label small text-muted mb-1">From</label>
+        <input type="date" id="dateFrom" class="form-control form-control-sm">
+    </div>
+    <div class="col-sm-3 col-md-2">
+        <label class="form-label small text-muted mb-1">To</label>
+        <input type="date" id="dateTo" class="form-control form-control-sm">
+    </div>
+    <div class="col-sm-auto d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <button type="button" id="resetFilters" class="btn btn-outline-secondary btn-sm">Reset</button>
+    </div>
+</form>
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-4">
+        <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="text-muted small text-uppercase mb-1">Total calls</div>
+            <div class="fs-3 fw-bold text-primary" id="kpiTotal">—</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-4">
+        <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="text-muted small text-uppercase mb-1">Unique callers</div>
+            <div class="fs-3 fw-bold" id="kpiUnique">—</div>
+        </div></div>
+    </div>
+    <div class="col-6 col-lg-4">
+        <div class="card shadow-sm h-100"><div class="card-body">
+            <div class="text-muted small text-uppercase mb-1">Missed calls</div>
+            <div class="fs-3 fw-bold text-danger" id="kpiMissed">—</div>
+        </div></div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm h-100"><div class="card-body">
+            <h6 class="text-muted small text-uppercase mb-3">Calls over time</h6>
+            <canvas id="dailyChart" height="110"></canvas>
+        </div></div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+            <input type="text" id="logSearch" class="form-control form-control-sm" style="max-width:240px;" placeholder="Search by phone number…">
+            <select id="statusFilter" class="form-select form-select-sm" style="max-width:160px;">
+                <option value="">All statuses</option>
+                <option value="completed">Completed</option>
+                <option value="missed">Missed</option>
+                <option value="busy">Busy</option>
+            </select>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr><th>Target</th><th>Caller</th><th>Duration</th><th>Status</th><th>Date</th></tr>
+                </thead>
+                <tbody id="logsBody">
+                    <tr><td colspan="5" class="text-center text-muted py-4">Loading…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center bg-white">
+        <span class="text-muted small" id="logsSummary"></span>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary btn-sm" id="prevPage" type="button">&larr; Prev</button>
+            <button class="btn btn-outline-secondary btn-sm" id="nextPage" type="button">Next &rarr;</button>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const statsUrl = "/api/calls/stats/";
+    const logsUrl = "/api/calls/logs/";
+    const exportUrl = "/api/calls/logs/export/";
+
+    const dateFromInput = document.getElementById('dateFrom');
+    const dateToInput = document.getElementById('dateTo');
+    const searchInput = document.getElementById('logSearch');
+    const statusSelect = document.getElementById('statusFilter');
+    const logsBody = document.getElementById('logsBody');
+    const logsSummary = document.getElementById('logsSummary');
+    const prevBtn = document.getElementById('prevPage');
+    const nextBtn = document.getElementById('nextPage');
+    const exportLink = document.getElementById('exportCsv');
+
+    let page = 1, numPages = 1, dailyChart = null, searchDebounce = null;
+
+    function baseParams() {
+        const p = new URLSearchParams();
+        if (dateFromInput.value) p.set('date_from', dateFromInput.value);
+        if (dateToInput.value) p.set('date_to', dateToInput.value);
+        return p;
+    }
+    function logsParams() {
+        const p = baseParams();
+        if (searchInput.value.trim()) p.set('q', searchInput.value.trim());
+        if (statusSelect.value) p.set('status', statusSelect.value);
+        p.set('page', page);
+        return p;
+    }
+    function updateExportLink() { exportLink.href = exportUrl + '?' + logsParams().toString(); }
+    function escapeHtml(v) { const d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
+    function statusBadge(s) {
+        const cls = s === 'completed' ? 'success' : s === 'busy' ? 'warning' : 'danger';
+        return `<span class="badge text-bg-${cls}">${escapeHtml(s)}</span>`;
+    }
+    function formatDuration(total) {
+        const seconds = Number(total) || 0;
+        const minutes = Math.floor(seconds / 60);
+        const rem = seconds % 60;
+        return minutes > 0 ? `${minutes}m ${rem}s` : `${rem}s`;
+    }
+    function loadStats() {
+        fetch(statsUrl + '?' + baseParams().toString()).then((r) => r.json()).then((data) => {
+            document.getElementById('kpiTotal').textContent = data.total_calls;
+            document.getElementById('kpiUnique').textContent = data.unique_callers;
+            document.getElementById('kpiMissed').textContent = data.missed_percentage + '%';
+            renderDailyChart(data.daily);
+        });
+    }
+    function renderDailyChart(daily) {
+        const ctx = document.getElementById('dailyChart');
+        if (dailyChart) dailyChart.destroy();
+        dailyChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: daily.map((d) => d.date),
+                datasets: [{
+                    label: 'Calls', data: daily.map((d) => d.count),
+                    borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.1)',
+                    tension: 0.3, fill: true,
+                }],
+            },
+            options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+        });
+    }
+    function loadLogs() {
+        updateExportLink();
+        fetch(logsUrl + '?' + logsParams().toString()).then((r) => r.json()).then((data) => {
+            numPages = data.num_pages;
+            if (!data.results.length) {
+                logsBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No calls found.</td></tr>';
+            } else {
+                logsBody.innerHTML = data.results.map((row) => `
+                    <tr>
+                        <td>${escapeHtml(row.target_phone_number)}</td>
+                        <td>${escapeHtml(row.caller_phone_number)}</td>
+                        <td>${formatDuration(row.duration_seconds)}</td>
+                        <td>${statusBadge(row.status)}</td>
+                        <td class="text-muted small">${new Date(row.created_at).toLocaleString()}</td>
+                    </tr>`).join('');
+            }
+            logsSummary.textContent = `${data.count} total · page ${data.page} of ${data.num_pages}`;
+            prevBtn.disabled = page <= 1;
+            nextBtn.disabled = page >= numPages;
+        });
+    }
+    function reloadAll() { page = 1; loadStats(); loadLogs(); }
+
+    document.getElementById('filterForm').addEventListener('submit', (e) => { e.preventDefault(); reloadAll(); });
+    document.getElementById('resetFilters').addEventListener('click', () => {
+        dateFromInput.value = ''; dateToInput.value = ''; reloadAll();
+    });
+    searchInput.addEventListener('input', () => {
+        clearTimeout(searchDebounce);
+        searchDebounce = setTimeout(() => { page = 1; loadLogs(); }, 300);
+    });
+    statusSelect.addEventListener('change', () => { page = 1; loadLogs(); });
+    prevBtn.addEventListener('click', () => { if (page > 1) { page--; loadLogs(); } });
+    nextBtn.addEventListener('click', () => { if (page < numPages) { page++; loadLogs(); } });
+
+    reloadAll();
+})();
+</script>
+{% endblock %}

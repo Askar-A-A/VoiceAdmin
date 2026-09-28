@@ -1,38 +1,62 @@
-{% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Dashboard — VoicePortal{% endblock %}
+
 {% block content %}
-<h1 class="h4 mb-4">Dashboard</h1>
+<div class="mb-4"><h4 class="mb-0">Dashboard</h4></div>
 
 <div class="row g-3 mb-4">
-  <div class="col-sm-6 col-lg-3">
-    <div class="card"><div class="card-body">
-      <div class="text-muted small">Audio files</div>
-      <div class="h3 mb-0">{{ file_count }}</div>
-    </div></div>
-  </div>
-  <div class="col-sm-6 col-lg-3">
-    <div class="card"><div class="card-body">
-      <div class="text-muted small">Storage used</div>
-      <div class="h3 mb-0">{{ (total_bytes / 1024 / 1024) | round(1) }} MB</div>
-    </div></div>
-  </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body py-4">
+                <div class="text-muted small text-uppercase mb-1">Audio files</div>
+                <div class="display-6 fw-bold text-primary">{{ file_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body py-4">
+                <div class="text-muted small text-uppercase mb-1">Storage used</div>
+                <div class="display-6 fw-bold">{{ total_bytes|filesizeformat }}</div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="card">
-  <div class="card-body">
-    <h2 class="h6">Recent files</h2>
-    {% if recent_files %}
-    <ul class="list-group list-group-flush">
-      {% for f in recent_files %}
-      <li class="list-group-item d-flex justify-content-between">
-        <span>{{ f.name }}</span>
-        <span class="text-muted small">{{ (f.size_bytes / 1024 / 1024) | round(1) }} MB</span>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="text-muted small mb-0">No files yet.</p>
-    {% endif %}
-  </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0">Recent uploads</h6>
+    {% if recent_files %}<a href="/audio/" class="small">View all</a>{% endif %}
 </div>
+
+{% if recent_files %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <tbody>
+                {% for file in recent_files %}
+                <tr>
+                    <td>
+                        <a href="/audio/{{ file.id }}/" class="text-decoration-none fw-medium">{{ file.name }}</a>
+                        <div class="text-muted small">{{ file.size_bytes|filesizeformat }}</div>
+                    </td>
+                    <td>
+                        <audio controls preload="none" style="height:32px;width:220px;">
+                            <source src="/audio/{{ file.id }}/stream/" type="audio/mpeg">
+                        </audio>
+                    </td>
+                    <td class="text-muted small">{{ file.uploaded_at|fmt_dt }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="card shadow-sm">
+    <div class="card-body text-center py-5 text-muted">
+        <p class="mb-3">No audio files yet.</p>
+        <a href="/audio/upload/" class="btn btn-primary">Upload your first file</a>
+    </div>
+</div>
+{% endif %}
 {% endblock %}

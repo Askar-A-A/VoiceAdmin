@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}VoicePortal — Self-service voice & IVR management{% endblock %}
+
+{% block content %}
+<div class="px-3 d-flex flex-column justify-content-center" style="min-height: calc(100vh - 56px - 3.5rem - 12vh); padding-bottom: 12vh;">
+    <div class="text-center py-5">
+        <h1 class="display-6 fw-bold mb-3">Your phone system, managed from the browser</h1>
+        <p class="text-muted mb-4 mx-auto" style="max-width: 520px;">
+            Upload audio, build phone menus, and manage your voice content yourself.
+        </p>
+        <div class="d-flex justify-content-center gap-2">
+            <a href="/accounts/register/" class="btn btn-primary btn-lg">Get started</a>
+            <a href="/accounts/login/" class="btn btn-outline-secondary btn-lg">Sign in</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

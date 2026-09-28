@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import (
     String, BigInteger, DateTime, ForeignKey, UniqueConstraint, func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -22,6 +22,8 @@ class Folder(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    files: Mapped[list["AudioFile"]] = relationship(back_populates="folder")
 
     def __str__(self) -> str:
         return self.name
@@ -44,6 +46,8 @@ class AudioFile(Base):
     uploaded_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+    folder: Mapped["Folder | None"] = relationship(back_populates="files")
 
     def __str__(self) -> str:
         return self.name

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 
@@ -20,3 +20,5 @@ class VoiceMessage(Base):
     menu_id: Mapped[int] = mapped_column(
         ForeignKey("menus.id", ondelete="CASCADE"), index=True
     )
+
+    menu = relationship("Menu")

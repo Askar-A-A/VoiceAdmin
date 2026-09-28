@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.core.security import (
     hash_password, verify_password, require_user, get_current_user,
 )
-from app.core.templates import templates, flash, get_flashed
+from app.core.templates import templates, flash
 from app.db.session import get_db
 from app.models.user import User
 from app.models.audio import AudioFile
@@ -88,7 +88,7 @@ def settings_page(
 ):
     return templates.TemplateResponse(
         "accounts/settings.html",
-        {"request": request, "user": user, "messages": get_flashed(request), **_stats(db, user)},
+        {"request": request, "user": user, **_stats(db, user)},
     )
 
 
