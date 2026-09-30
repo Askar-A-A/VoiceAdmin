@@ -76,7 +76,7 @@
                         <source src="/voicemail/stream/{{ message.id }}/" type="audio/mpeg">
                     </audio>
                     <div class="d-inline-flex gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Download</button>
+                        <a href="/voicemail/{{ message.id }}/download/" class="btn btn-outline-secondary btn-sm">Download</a>
                         <form method="post" action="/voicemail/{{ message.id }}/delete/"
                               onsubmit="return confirm('Delete this voice message? This cannot be undone.')">
                             <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
