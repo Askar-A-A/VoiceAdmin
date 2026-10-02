@@ -71,7 +71,19 @@ def voicemail_stream(pk: int, user: User = Depends(require_user), db: Session = 
         media_type=r.headers.get("Content-Type", "audio/mpeg"),
     )
         
-    
+
+
+@router.post("/voicemail/{pk}/delete/")
+def voicemail_delete(request: Request, pk: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    vm = _get_message(db, pk, user)
+    delete_from_carrierx(vm.recording_sid)
+    caller = vm.caller_number
+    db.delete(vm)
+    db.commit()
+    flash(request, f'"{caller}" deleted.')
+    return RedirectResponse("/voicemail/", status_code=303)
+
+
 @router.get("/voicemail/{pk}/download/")
 def voicemail_download(pk: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
     
@@ -93,13 +105,3 @@ def voicemail_download(pk: int, user: User = Depends(require_user), db: Session 
         )
 
 
-
-@router.post("/voicemail/{pk}/delete/")
-def voicemail_delete(request: Request, pk: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
-    vm = _get_message(db, pk, user)
-    delete_from_carrierx(vm.recording_sid)
-    caller = vm.caller_number
-    db.delete(vm)
-    db.commit()
-    flash(request, f'"{caller}" deleted.')
-    return RedirectResponse("/voicemail/", status_code=303)

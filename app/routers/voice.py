@@ -16,6 +16,8 @@ from app.models.voicemail import VoiceMessage
 from app.services import flexml
 from app.services.carrierx import stream_from_carrierx
 from app.routers.calls import log_call
+from app.models.user import User
+from app.services.notifications import send_voicemail_notifications
 
 router = APIRouter()
 
@@ -161,6 +163,11 @@ async def menu_record(request: Request, pk: int, db: Session = Depends(get_db)):
         recording_sid=_param(params, "RecordingUrl"),
     ))
     db.commit()
+
+    user = db.query(User).filter(User.id == menu.owner_id ).first()
+
+    send_voicemail_notifications(to_email=user.email,caller_number=_caller_number(params))
+
     return _xml(flexml.say("Your message has been recorded. Goodbye."))
 
 
