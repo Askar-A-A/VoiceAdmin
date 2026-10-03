@@ -16,6 +16,7 @@ from app.models.audio import AudioFile, Folder
 from app.services.carrierx import (
     upload_to_carrierx, delete_from_carrierx, stream_from_carrierx,
 )
+from app.schemas.audio import UploadResult
 
 router = APIRouter()
 
@@ -75,7 +76,7 @@ def audio_upload_form(request: Request, user: User = Depends(require_user)):
     return templates.TemplateResponse("audio/upload.html", {"request": request, "user": user})
 
 
-@router.post("/audio/upload/ajax/")
+@router.post("/audio/upload/ajax/", response_model=UploadResult)
 async def audio_upload_ajax(
     file: UploadFile = File(...),
     user: User = Depends(require_user),
@@ -95,7 +96,7 @@ async def audio_upload_ajax(
         container_sid=settings.CARRIERX_CONTAINER_SID, size_bytes=len(contents),
     ))
     db.commit()
-    return JSONResponse({"success": True, "name": file.filename})
+    return UploadResult(success=True, name=file.filename)
 
 
 @router.get("/audio/{pk}/")

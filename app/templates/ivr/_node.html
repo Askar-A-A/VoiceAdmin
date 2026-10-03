@@ -19,6 +19,7 @@
             {% if not node.is_root %}
             <form method="post" action="/phone-menu/menu/{{ node.id }}/delete/"
                   onsubmit="return confirm('Delete &quot;{{ node.name }}&quot; and everything under it?')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
             </form>
             {% endif %}

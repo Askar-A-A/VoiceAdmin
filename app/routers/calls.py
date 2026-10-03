@@ -3,8 +3,8 @@ import hmac
 import io
 from datetime import date
 
-from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse, StreamingResponse, PlainTextResponse
+from fastapi import APIRouter, Depends, Request, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,7 @@ from app.models.ivr import IVRConfig
 from app.models.calls import (
     Call, CallLog, normalize_phone_number, COMPLETED, MISSED, BUSY, CALL_STATUSES,
 )
+from app.schemas.calls import CallLogOut, CallStats, CallLogsPage, WebhookResult
 
 router = APIRouter()
 
@@ -130,12 +131,12 @@ def call_analytics_dashboard(request: Request, user: User = Depends(require_user
     })
 
 
-@router.get("/api/calls/stats/")
+@router.get("/api/calls/stats/", response_model=CallStats)
 def api_calls_stats(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
-    return JSONResponse(build_stats(db, request.query_params, _own_target_number(db, user)))
+    return build_stats(db, request.query_params, _own_target_number(db, user))
 
 
-@router.get("/api/calls/logs/")
+@router.get("/api/calls/logs/", response_model=CallLogsPage)
 def api_calls_logs(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     params = request.query_params
     query = _filtered_logs(db, params, _own_target_number(db, user))
@@ -155,19 +156,10 @@ def api_calls_logs(request: Request, user: User = Depends(require_user), db: Ses
     page = min(page, num_pages)
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    results = [{
-        "id": log.id,
-        "target_phone_number": log.target_phone_number,
-        "caller_phone_number": log.caller_phone_number,
-        "location_country": log.location_country,
-        "location_city": log.location_city,
-        "ip_address": log.ip_address,
-        "duration_seconds": log.duration_seconds,
-        "status": log.status,
-        "created_at": log.created_at.isoformat(),
-    } for log in rows]
-
-    return JSONResponse({"results": results, "count": count, "page": page, "num_pages": num_pages})
+    return CallLogsPage(
+        results=[CallLogOut.model_validate(log) for log in rows],
+        count=count, page=page, num_pages=num_pages,
+    )
 
 
 @router.get("/api/calls/logs/export/")
@@ -195,12 +187,12 @@ def api_calls_logs_export(request: Request, user: User = Depends(require_user), 
     )
 
 
-@router.post("/api/webhooks/calls/")
+@router.post("/api/webhooks/calls/", response_model=WebhookResult, status_code=201)
 async def webhook_calls(request: Request, db: Session = Depends(get_db)):
     expected = settings.CALL_WEBHOOK_API_KEY
     provided = request.headers.get("X-Webhook-Key", "")
     if not expected or not hmac.compare_digest(provided, expected):
-        return PlainTextResponse("Invalid or missing webhook key.", status_code=403)
+        raise HTTPException(status_code=403, detail="Invalid or missing webhook key.")
 
     form = {}
     try:
@@ -227,7 +219,7 @@ async def webhook_calls(request: Request, db: Session = Depends(get_db)):
     target = param("target_phone_number", "To", "to", "Called", "DNIS")
     caller = param("caller_phone_number", "From", "from", "Caller", "CallerID")
     if not target or not caller:
-        return JSONResponse({"error": "target and caller phone numbers are required."}, status_code=400)
+        raise HTTPException(status_code=400, detail="target and caller phone numbers are required.")
 
     raw_status = param("status", "CallStatus", "DialCallStatus").lower()
     status = _STATUS_ALIASES.get(raw_status, COMPLETED)
@@ -248,4 +240,4 @@ async def webhook_calls(request: Request, db: Session = Depends(get_db)):
     db.add(call_log)
     db.commit()
     db.refresh(call_log)
-    return JSONResponse({"success": True, "id": call_log.id}, status_code=201)
+    return WebhookResult(success=True, id=call_log.id)

@@ -23,6 +23,7 @@
             <div class="card-body p-4">
                 <h6 class="text-muted text-uppercase small mb-3">Rename</h6>
                 <form method="post" action="/audio/{{ audio.id }}/">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <div class="input-group">
                         <input type="text" name="name" value="{{ audio.name }}" class="form-control" maxlength="255" required>
                         <button type="submit" class="btn btn-primary">Save</button>
@@ -58,6 +59,7 @@
             <div class="card-body p-4">
                 <h6 class="text-muted text-uppercase small mb-3">Folder</h6>
                 <form method="post" action="/audio/{{ audio.id }}/move/" class="d-flex gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     <select name="folder" class="form-select">
                         <option value="" {% if not audio.folder_id %}selected{% endif %}>All files (no folder)</option>
                         {% for folder in folders %}
@@ -73,6 +75,7 @@
             <a href="/audio/{{ audio.id }}/download/" class="btn btn-outline-secondary">Download</a>
             <form method="post" action="/audio/{{ audio.id }}/delete/"
                   onsubmit="return confirm('Delete &quot;{{ audio.name }}&quot;? This cannot be undone.')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit" class="btn btn-outline-danger">Delete</button>
             </form>
         </div>

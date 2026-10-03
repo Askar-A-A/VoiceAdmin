@@ -9,6 +9,7 @@
       <div class="card-body">
         <h2 class="h6">Profile</h2>
         <form method="post" action="/accounts/settings/">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="update_profile">
           <label class="form-label small">Email</label>
           <input class="form-control mb-2" type="email" name="email" value="{{ user.email }}" required>
@@ -25,6 +26,7 @@
       <div class="card-body">
         <h2 class="h6">Change password</h2>
         <form method="post" action="/accounts/settings/">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <input type="hidden" name="action" value="change_password">
           <input class="form-control mb-2" type="password" name="current_password" placeholder="Current password" required>
           <input class="form-control mb-2" type="password" name="new_password" placeholder="New password" required>

@@ -1,3 +1,5 @@
+import secrets
+
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
@@ -12,6 +14,18 @@ def _inject_messages(request: Request) -> dict:
     except (AssertionError, AttributeError, KeyError):
         messages = []
     return {"messages": messages}
+
+
+def _inject_csrf(request: Request) -> dict:
+    """Ensure a CSRF token exists in the session and expose it to templates."""
+    try:
+        token = request.session.get("csrf_token")
+        if not token:
+            token = secrets.token_urlsafe(32)
+            request.session["csrf_token"] = token
+    except (AssertionError, AttributeError):
+        token = ""
+    return {"csrf_token": token}
 
 
 class _Templates(Jinja2Templates):
@@ -30,7 +44,10 @@ class _Templates(Jinja2Templates):
         return super().TemplateResponse(*args, **kwargs)
 
 
-templates = _Templates(directory="app/templates", context_processors=[_inject_messages])
+templates = _Templates(
+    directory="app/templates",
+    context_processors=[_inject_messages, _inject_csrf],
+)
 templates.env.filters["filesizeformat"] = filesizeformat
 templates.env.filters["fmt_dt"] = fmt_dt
 templates.env.globals["menu_type_label"] = lambda t: MENU_TYPE_LABELS.get(t, t)

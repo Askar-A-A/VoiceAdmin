@@ -16,6 +16,7 @@
         <div class="card shadow-sm">
             <div class="card-body p-4">
                 <form method="post" novalidate>
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     {% if not is_root %}
                     <div class="mb-3">
                         <label class="form-label" for="id_key">Key</label>
