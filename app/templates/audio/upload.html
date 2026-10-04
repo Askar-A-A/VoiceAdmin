@@ -79,6 +79,8 @@
 
         const xhr = new XMLHttpRequest();
         xhr.open('POST', uploadUrl);
+        const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+        if (csrfMeta) xhr.setRequestHeader('X-CSRF-Token', csrfMeta.content);
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {
                 const pct = Math.round((e.loaded / e.total) * 100);

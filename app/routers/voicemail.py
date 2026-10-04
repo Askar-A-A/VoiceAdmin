@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import RedirectResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
+from starlette.responses import FileResponse as FileResponse
 
 from app.core.security import require_user
 from app.core.templates import templates, flash
@@ -8,6 +9,7 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.ivr import Menu
 from app.models.voicemail import VoiceMessage
+from app.core.config import settings
 from app.services.carrierx import stream_from_carrierx, delete_from_carrierx
 
 router = APIRouter()
@@ -55,14 +57,20 @@ def voicemail_dashboard(
 
 @router.get("/voicemail/stream/{pk}/")
 def voicemail_stream(pk: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    
     vm = _get_message(db, pk, user)
-    r = stream_from_carrierx(vm.recording_sid)
-    if r.status_code != 200:
-        return Response(status_code=404)
-    return StreamingResponse(
+
+    if settings.TESTING:
+        return FileResponse(path = "app/static/test/o-privet.mp3", media_type = "audio/mpeg" )
+    else:
+        r = stream_from_carrierx(vm.recording_sid)
+        if r.status_code != 200:
+            return Response(status_code=404)
+        return StreamingResponse(
         r.iter_content(chunk_size=8192),
         media_type=r.headers.get("Content-Type", "audio/mpeg"),
     )
+        
 
 
 @router.post("/voicemail/{pk}/delete/")
@@ -74,3 +82,26 @@ def voicemail_delete(request: Request, pk: int, user: User = Depends(require_use
     db.commit()
     flash(request, f'"{caller}" deleted.')
     return RedirectResponse("/voicemail/", status_code=303)
+
+
+@router.get("/voicemail/{pk}/download/")
+def voicemail_download(pk: int, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    
+    vm = _get_message(db, pk, user)
+
+    if settings.TESTING:
+        return FileResponse(filename= "voicemail.mp3" , path = "app/static/test/o-privet.mp3", media_type = "audio/mpeg" )
+    else:
+        r = stream_from_carrierx(vm.recording_sid)
+        if r.status_code != 200:  
+            return Response(status_code=404)
+        filename = vm.caller_number.replace('"', "")
+        if "." not in filename:
+            filename += ".mp3"
+        return StreamingResponse(
+                r.iter_content(chunk_size=8192),
+                media_type=r.headers.get("Content-Type", "audio/mpeg"),
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+

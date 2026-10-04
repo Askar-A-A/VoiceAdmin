@@ -13,5 +13,10 @@ class Settings(BaseSettings):
 
     MAX_AUDIO_UPLOAD_SIZE: int = 50 * 1024 * 1024  # 50 MB
 
+    TESTING: bool = False
+
+    EMAIL_HOST_USER: str = "" 
+    EMAIL_HOST_PASSWORD: str = ""
+
 
 settings = Settings()
