@@ -164,14 +164,19 @@ async def menu_record(request: Request, pk: int, db: Session = Depends(get_db)):
     ))
     db.commit()
 
-    user = db.query(User).filter(User.id == menu.owner_id ).first()
+    user = db.query(User).filter(User.id == menu.owner_id).first()
 
-    send_voicemail_notifications(to_email=user.email,caller_number=_caller_number(params))
+    # Email is best-effort: a failed/flaky SMTP must never break the call flow.
+    if user:
+        try:
+            send_voicemail_notifications(to_email=user.email, caller_number=_caller_number(params))
+        except Exception as e:
+            print(f"Voicemail email failed: {e}")
 
     return _xml(flexml.say("Your message has been recorded. Goodbye."))
 
 
-@router.get("/voice/play/{file_sid}/")
+@router.api_route("/voice/play/{file_sid}/", methods=["GET", "HEAD"])
 def voice_play(file_sid: str):
     r = stream_from_carrierx(file_sid)
     if r.status_code != 200:
