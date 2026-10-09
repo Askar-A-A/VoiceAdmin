@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Conferences — VoicePortal{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h4 class="mb-1">Conference calls</h4>
+    <p class="text-muted mb-0">Create a conference room. Callers dial in and enter a code — the code decides their role.</p>
+</div>
+
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="post" action="/conferences/create/" class="d-flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <input type="text" name="name" class="form-control" placeholder="Conference name" maxlength="100" required style="max-width:280px;">
+            <button type="submit" class="btn btn-primary">Create conference</button>
+        </form>
+    </div>
+</div>
+
+{% if conferences %}
+<div class="card shadow-sm">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th>Name</th>
+                    <th>Host code</th>
+                    <th>Participant code</th>
+                    <th>Listener code</th>
+                    <th>Dial-in</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for conf in conferences %}
+                <tr>
+                    <td class="fw-medium">{{ conf.name }}</td>
+                    <td><code>{{ conf.host_code }}</code></td>
+                    <td><code>{{ conf.participant_code }}</code></td>
+                    <td><code>{{ conf.listener_code }}</code></td>
+                    <td class="text-muted small">{{ conf.dial_in_number or '—' }}</td>
+                    <td class="text-end">
+                        <form method="post" action="/conferences/{{ conf.id }}/delete/"
+                              onsubmit="return confirm('Delete conference &quot;{{ conf.name }}&quot;?')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+    <p class="mb-0">No conferences yet. Create one above.</p>
+</div>
+{% endif %}
+{% endblock %}

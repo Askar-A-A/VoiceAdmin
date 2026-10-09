@@ -15,8 +15,12 @@ class Settings(BaseSettings):
 
     TESTING: bool = False
 
-    EMAIL_HOST_USER: str = "" 
+    EMAIL_HOST_USER: str = ""
     EMAIL_HOST_PASSWORD: str = ""
+
+    # CarrierX Conference v2 uses its own HTTP Basic creds (not the Bearer token).
+    CARRIERX_CONF_LOGIN: str = ""
+    CARRIERX_CONF_PASSWORD: str = ""
 
 
 settings = Settings()

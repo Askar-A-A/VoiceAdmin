@@ -4,6 +4,7 @@ from app.models.audio import Folder, AudioFile
 from app.models.ivr import IVRConfig, Menu
 from app.models.calls import Call, CallLog
 from app.models.voicemail import VoiceMessage
+from app.models.conference import Conference
 
 __all__ = [
     "User",
@@ -14,4 +15,5 @@ __all__ = [
     "Call",
     "CallLog",
     "VoiceMessage",
+    "Conference",
 ]
