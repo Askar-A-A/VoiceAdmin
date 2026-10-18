@@ -28,10 +28,13 @@
                 <input type="text" name="phone_number" value="{{ config.phone_number }}"
                        class="form-control" placeholder="+1 484 968 7622">
                 {% endif %}
-                <div class="form-text">Callers dial this number and go straight to your menu — no access code needed.</div>
             </div>
             <div class="col-md-3">
                 <button type="submit" class="btn btn-primary">Save number</button>
+            </div>
+            <!-- Hint lives outside the input column so align-items-end lines the button up with the field. -->
+            <div class="col-12 mt-1">
+                <div class="form-text mt-0">Callers dial this number and go straight to your menu — no access code needed.</div>
             </div>
         </form>
         {% if not config.phone_number %}

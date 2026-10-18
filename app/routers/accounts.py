@@ -98,6 +98,7 @@ def settings_submit(
     action: str = Form(...),
     email: str = Form(""),
     name: str = Form(""),
+    email_notifications_enabled: str = Form(""),
     current_password: str = Form(""),
     new_password: str = Form(""),
     confirm_password: str = Form(""),
@@ -126,6 +127,12 @@ def settings_submit(
             db.commit()
             flash(request, "Password changed.")
             return RedirectResponse("/accounts/settings/", status_code=303)
+    elif action == "update_notifications":
+        user.email_notifications_enabled = email_notifications_enabled == "on"
+        db.commit()
+        flash(request, "Notifications updated.")
+        return RedirectResponse("/accounts/settings/", status_code=303)
+    
 
     return templates.TemplateResponse(
         "accounts/settings.html",

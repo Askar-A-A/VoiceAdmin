@@ -96,13 +96,18 @@ def _conditions(params, restrict_to_number: str) -> list:
 
 
 def build_stats(db: Session, params, restrict_to_number: str) -> dict:
+    group = params.get("group")
     conds = _conditions(params, restrict_to_number)
     total = db.query(func.count(CallLog.id)).filter(*conds).scalar() or 0
     unique = db.query(func.count(func.distinct(CallLog.caller_phone_number))).filter(*conds).scalar() or 0
     missed = db.query(func.count(CallLog.id)).filter(*conds, CallLog.status == MISSED).scalar() or 0
     missed_pct = (missed / total * 100) if total else 0
 
-    day = func.date(CallLog.created_at)
+    if group == "hour":
+        day = func.date_trunc('hour', CallLog.created_at)
+    else:
+        day = func.date(CallLog.created_at)
+
     daily_rows = (
         db.query(day.label("day"), func.count(CallLog.id))
         .filter(*conds).group_by(day).order_by(day).all()

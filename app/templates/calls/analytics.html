@@ -58,7 +58,15 @@
 <div class="row g-3 mb-4">
     <div class="col-12">
         <div class="card shadow-sm h-100"><div class="card-body">
-            <h6 class="text-muted small text-uppercase mb-3">Calls over time</h6>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="text-muted small text-uppercase mb-0">Calls over time</h6>
+                <div class="btn-group btn-group-sm" role="group" aria-label="Chart grouping">
+                    <input type="radio" class="btn-check" name="chartGroup" id="groupDay" value="day" checked>
+                    <label class="btn btn-outline-secondary" for="groupDay">Days</label>
+                    <input type="radio" class="btn-check" name="chartGroup" id="groupHour" value="hour">
+                    <label class="btn btn-outline-secondary" for="groupHour">Hours</label>
+                </div>
+            </div>
             <canvas id="dailyChart" height="110"></canvas>
         </div></div>
     </div>
@@ -127,8 +135,20 @@
         const rem = seconds % 60;
         return minutes > 0 ? `${minutes}m ${rem}s` : `${rem}s`;
     }
+    function chartGroup() {
+        return document.querySelector('input[name="chartGroup"]:checked').value;
+    }
+    function formatPointLabel(value) {
+        if (chartGroup() !== 'hour') return value;
+        // Hourly points come as ISO timestamps; show them in the viewer's local time.
+        const d = new Date(value);
+        if (isNaN(d)) return value;
+        return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
     function loadStats() {
-        fetch(statsUrl + '?' + baseParams().toString()).then((r) => r.json()).then((data) => {
+        const p = baseParams();
+        p.set('group', chartGroup());
+        fetch(statsUrl + '?' + p.toString()).then((r) => r.json()).then((data) => {
             document.getElementById('kpiTotal').textContent = data.total_calls;
             document.getElementById('kpiUnique').textContent = data.unique_callers;
             document.getElementById('kpiMissed').textContent = data.missed_percentage + '%';
@@ -141,7 +161,7 @@
         dailyChart = new Chart(ctx, {
             type: 'line',
             data: {
-                labels: daily.map((d) => d.date),
+                labels: daily.map((d) => formatPointLabel(d.date)),
                 datasets: [{
                     label: 'Calls', data: daily.map((d) => d.count),
                     borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.1)',
@@ -181,6 +201,7 @@
         clearTimeout(searchDebounce);
         searchDebounce = setTimeout(() => { page = 1; loadLogs(); }, 300);
     });
+    document.querySelectorAll('input[name="chartGroup"]').forEach((el) => el.addEventListener('change', loadStats));
     prevBtn.addEventListener('click', () => { if (page > 1) { page--; loadLogs(); } });
     nextBtn.addEventListener('click', () => { if (page < numPages) { page++; loadLogs(); } });
 

@@ -211,7 +211,7 @@ async def menu_record(request: Request, pk: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == menu.owner_id).first()
 
     # Email is best-effort: a failed/flaky SMTP must never break the call flow.
-    if user:
+    if user and user.email_notifications_enabled:
         try:
             send_voicemail_notifications(to_email=user.email, caller_number=_caller_number(params))
         except Exception as e:
