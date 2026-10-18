@@ -1,7 +1,7 @@
 import csv
 import hmac
 import io
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import StreamingResponse
@@ -15,26 +15,55 @@ from app.db.session import get_db
 from app.models.user import User
 from app.models.ivr import IVRConfig
 from app.models.calls import (
-    Call, CallLog, normalize_phone_number, COMPLETED, MISSED, BUSY, CALL_STATUSES,
+    Call, CallLog, normalize_phone_number, COMPLETED, MISSED, BUSY,
 )
 from app.schemas.calls import CallLogOut, CallStats, CallLogsPage, WebhookResult
 
 router = APIRouter()
 
 LOGS_PAGE_SIZE = 25
-LOGS_ORDERING = {
-    "created_at", "-created_at", "duration_seconds", "-duration_seconds", "status", "-status",
-}
+LOGS_ORDERING = {"created_at", "-created_at", "duration_seconds", "-duration_seconds"}
 
 
 # --- recording calls --------------------------------------------------------
 
-def log_call(db: Session, owner_id: int, to_number: str = "", from_number: str = "") -> None:
+def log_call(db: Session, owner_id: int, to_number: str = "", from_number: str = "", call_sid: str = "") -> None:
     """Called from the IVR webhook when a call is answered."""
     to_n = normalize_phone_number(to_number)
     from_n = normalize_phone_number(from_number)
-    db.add(CallLog(target_phone_number=to_n, caller_phone_number=from_n))
+    db.add(CallLog(target_phone_number=to_n, caller_phone_number=from_n, call_sid=call_sid or None))
     db.add(Call(owner_id=owner_id, to_number=to_n, from_number=from_n))
+    db.commit()
+
+
+def finish_call(
+    db: Session, call_sid: str = "", to_number: str = "", from_number: str = "", duration: int | None = None,
+) -> None:
+    """Called from the status callback when a call ends: fill in its duration."""
+    log = None
+    if call_sid:
+        log = db.query(CallLog).filter(CallLog.call_sid == call_sid).first()
+    if not log:
+        # No call id to match on: take the latest still-open call between the two numbers.
+        log = (
+            db.query(CallLog)
+            .filter(
+                CallLog.target_phone_number == normalize_phone_number(to_number),
+                CallLog.caller_phone_number == normalize_phone_number(from_number),
+                CallLog.duration_seconds == 0,
+            )
+            .order_by(CallLog.id.desc())
+            .first()
+        )
+    if not log:
+        return
+    if duration is None:
+        # The callback arrives as the call ends, so time since the row was created is the length.
+        started = log.created_at
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        duration = int((datetime.now(timezone.utc) - started).total_seconds())
+    log.duration_seconds = max(0, duration)
     db.commit()
 
 
@@ -99,9 +128,6 @@ def _own_target_number(db: Session, user: User) -> str:
 
 def _filtered_logs(db: Session, params, restrict_to_number: str):
     conds = _conditions(params, restrict_to_number)
-    status = (params.get("status") or "").strip()
-    if status in CALL_STATUSES:
-        conds.append(CallLog.status == status)
     q = (params.get("q") or "").strip()
     if q:
         digits = normalize_phone_number(q)
@@ -170,14 +196,14 @@ def api_calls_logs_export(request: Request, user: User = Depends(require_user), 
     writer = csv.writer(buffer)
     writer.writerow([
         "ID", "Target number", "Caller number", "Country", "City",
-        "IP address", "Duration (s)", "Duration (min)", "Status", "Created at",
+        "IP address", "Duration (s)", "Duration (min)", "Created at",
     ])
     for log in query.all():
         writer.writerow([
             log.id, log.target_phone_number, log.caller_phone_number,
             log.location_country, log.location_city, log.ip_address or "",
             log.duration_seconds, _format_duration(log.duration_seconds),
-            log.status, log.created_at.isoformat(),
+            log.created_at.isoformat(),
         ])
     buffer.seek(0)
     return StreamingResponse(

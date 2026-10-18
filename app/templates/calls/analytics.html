@@ -68,20 +68,14 @@
     <div class="card-body">
         <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
             <input type="text" id="logSearch" class="form-control form-control-sm" style="max-width:240px;" placeholder="Search by phone number…">
-            <select id="statusFilter" class="form-select form-select-sm" style="max-width:160px;">
-                <option value="">All statuses</option>
-                <option value="completed">Completed</option>
-                <option value="missed">Missed</option>
-                <option value="busy">Busy</option>
-            </select>
         </div>
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
-                    <tr><th>Target</th><th>Caller</th><th>Duration</th><th>Status</th><th>Date</th></tr>
+                    <tr><th>Target</th><th>Caller</th><th>Duration</th><th>Date</th></tr>
                 </thead>
                 <tbody id="logsBody">
-                    <tr><td colspan="5" class="text-center text-muted py-4">Loading…</td></tr>
+                    <tr><td colspan="4" class="text-center text-muted py-4">Loading…</td></tr>
                 </tbody>
             </table>
         </div>
@@ -105,7 +99,6 @@
     const dateFromInput = document.getElementById('dateFrom');
     const dateToInput = document.getElementById('dateTo');
     const searchInput = document.getElementById('logSearch');
-    const statusSelect = document.getElementById('statusFilter');
     const logsBody = document.getElementById('logsBody');
     const logsSummary = document.getElementById('logsSummary');
     const prevBtn = document.getElementById('prevPage');
@@ -123,16 +116,11 @@
     function logsParams() {
         const p = baseParams();
         if (searchInput.value.trim()) p.set('q', searchInput.value.trim());
-        if (statusSelect.value) p.set('status', statusSelect.value);
         p.set('page', page);
         return p;
     }
     function updateExportLink() { exportLink.href = exportUrl + '?' + logsParams().toString(); }
     function escapeHtml(v) { const d = document.createElement('div'); d.textContent = v == null ? '' : String(v); return d.innerHTML; }
-    function statusBadge(s) {
-        const cls = s === 'completed' ? 'success' : s === 'busy' ? 'warning' : 'danger';
-        return `<span class="badge text-bg-${cls}">${escapeHtml(s)}</span>`;
-    }
     function formatDuration(total) {
         const seconds = Number(total) || 0;
         const minutes = Math.floor(seconds / 60);
@@ -168,14 +156,13 @@
         fetch(logsUrl + '?' + logsParams().toString()).then((r) => r.json()).then((data) => {
             numPages = data.num_pages;
             if (!data.results.length) {
-                logsBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No calls found.</td></tr>';
+                logsBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">No calls found.</td></tr>';
             } else {
                 logsBody.innerHTML = data.results.map((row) => `
                     <tr>
                         <td>${escapeHtml(row.target_phone_number)}</td>
                         <td>${escapeHtml(row.caller_phone_number)}</td>
                         <td>${formatDuration(row.duration_seconds)}</td>
-                        <td>${statusBadge(row.status)}</td>
                         <td class="text-muted small">${new Date(row.created_at).toLocaleString()}</td>
                     </tr>`).join('');
             }
@@ -194,7 +181,6 @@
         clearTimeout(searchDebounce);
         searchDebounce = setTimeout(() => { page = 1; loadLogs(); }, 300);
     });
-    statusSelect.addEventListener('change', () => { page = 1; loadLogs(); });
     prevBtn.addEventListener('click', () => { if (page > 1) { page--; loadLogs(); } });
     nextBtn.addEventListener('click', () => { if (page < numPages) { page++; loadLogs(); } });
 

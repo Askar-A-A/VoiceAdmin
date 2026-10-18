@@ -6,4 +6,5 @@ venv/
 .DS_Store
 *.log
 CLAUDE.md
+ngrok.exe
 conspect.txt

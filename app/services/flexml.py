@@ -38,11 +38,26 @@ def dial(number: str) -> str:
     return _document(f'<Dial>{escape(number)}</Dial>')
 
 
-def record(play_url: str | None, action_url: str, max_length: int = 120) -> str:
+def record(play_url: str | None, action_url: str, max_length: int = 120, say_text: str | None = None) -> str:
     inner = f'<Play>{escape(play_url)}</Play>' if play_url else ''
+    if say_text:
+        inner += f'<Say>{escape(say_text)}</Say>'
     inner += f'<Record action={quoteattr(action_url)} method="POST" maxLength="{max_length}"/>'
     return _document(inner)
 
 
 def say(text: str) -> str:
     return _document(f'<Say>{escape(text)}</Say><Hangup/>')
+
+
+def review_menu(action_url: str, play_url: str | None = None) -> str:
+    """Post-recording menu; `play_url` plays the caller's own message back first."""
+    gather = f'<Gather numDigits="1" action={quoteattr(action_url)} method="POST" timeout="8">'
+    if play_url:
+        gather += f'<Play>{escape(play_url)}</Play>'
+    gather += (
+        '<Say>To listen to your message, press 1. To delete it and record again, press 2. '
+        'To send it, just hang up.</Say>'
+        '</Gather>'
+    )
+    return _document(gather + '<Say>Your message has been saved. Goodbye.</Say><Hangup/>')

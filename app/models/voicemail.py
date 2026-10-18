@@ -16,7 +16,7 @@ class VoiceMessage(Base):
     )
     duration: Mapped[str] = mapped_column(String(20), default="")
     is_new: Mapped[bool] = mapped_column(Boolean, default=True)
-    recording_sid: Mapped[str] = mapped_column(String(100), unique=True)
+    recording_sid: Mapped[str] = mapped_column(String(500), unique=True)
     menu_id: Mapped[int] = mapped_column(
         ForeignKey("menus.id", ondelete="CASCADE"), index=True
     )

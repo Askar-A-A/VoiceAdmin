@@ -49,6 +49,9 @@ class CallLog(Base):
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     duration_seconds: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20), default=COMPLETED, index=True)
+    # Provider's id for the call; lets the end-of-call callback find this row.
+    call_sid: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), index=True
     )
+  

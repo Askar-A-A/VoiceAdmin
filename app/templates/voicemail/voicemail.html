@@ -22,7 +22,7 @@
         <div class="card shadow-sm h-100">
             <div class="card-body">
                 <div class="text-muted small text-uppercase mb-1">New</div>
-                <div class="fs-3 fw-bold text-primary">{{ new_count }}</div>
+                <div class="fs-3 fw-bold text-primary" id="newCount">{{ new_count }}</div>
             </div>
         </div>
     </div>
@@ -63,7 +63,7 @@
                     <div>
                         <div class="fw-medium">
                             {{ message.caller_number }}
-                            {% if message.is_new %}<span class="badge text-bg-primary ms-1">New</span>{% endif %}
+                            {% if message.is_new %}<span class="badge text-bg-primary ms-1 js-new-badge">New</span>{% endif %}
                         </div>
                         <div class="text-muted small">
                             {{ message.menu.name }} &middot; {{ message.received_at|fmt_dt }} &middot; {{ message.duration }}
@@ -94,4 +94,18 @@
     <p class="mb-0">No voice messages yet. When a caller leaves a message, it will show up here.</p>
 </div>
 {% endif %}
+
+<script>
+    // The server marks a message as listened when its audio is requested;
+    // mirror that on the page so no reload is needed.
+    const newCount = document.getElementById('newCount');
+    document.querySelectorAll('audio').forEach((player) => {
+        player.addEventListener('play', () => {
+            const badge = player.closest('.list-group-item').querySelector('.js-new-badge');
+            if (!badge) return;
+            badge.remove();
+            newCount.textContent = Math.max(0, parseInt(newCount.textContent, 10) - 1);
+        });
+    });
+</script>
 {% endblock %}

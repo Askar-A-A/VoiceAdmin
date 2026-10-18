@@ -5,6 +5,7 @@ carried in the URL (which menu we're in), so the endpoints are stateless.
 """
 import json
 import re
+from urllib.parse import quote, urlencode
 
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import Response, StreamingResponse
@@ -14,8 +15,8 @@ from app.db.session import get_db
 from app.models.ivr import Menu, IVRConfig, PLAYBACK_AND_RECORD, DIAL_OUT
 from app.models.voicemail import VoiceMessage
 from app.services import flexml
-from app.services.carrierx import stream_from_carrierx
-from app.routers.calls import log_call
+from app.services.carrierx import stream_from_carrierx, delete_from_carrierx
+from app.routers.calls import log_call, finish_call
 from app.models.user import User
 from app.services.notifications import send_voicemail_notifications
 
@@ -37,12 +38,13 @@ async def _params(request: Request) -> dict:
     data = {}
     if request.query_params:
         data.update({k: v for k, v in request.query_params.items()})
+    body = await request.body()
     try:
         form = await request.form()
         data.update({k: str(v) for k, v in form.items()})
     except Exception:
         pass
-    body = await request.body()
+    
     if body:
         try:
             parsed = json.loads(body.decode("utf-8"))
@@ -62,6 +64,14 @@ def _param(params: dict, name: str) -> str:
 
 def _caller_number(params: dict) -> str:
     for key in ("From", "Caller", "CallerID", "CallerId", "from", "caller"):
+        value = _param(params, key)
+        if value:
+            return value
+    return ""
+
+
+def _dialed_number(params: dict) -> str:
+    for key in ("To", "Called", "CalledNumber", "DNIS", "Destination", "to", "did", "number"):
         value = _param(params, key)
         if value:
             return value
@@ -92,6 +102,10 @@ def _render_menu(request: Request, menu: Menu) -> str:
     return flexml.play_and_gather(play_url, _abs(request, f"/voice/menu/{menu.id}/"))
 
 
+def _review_url(request: Request, menu: Menu, recording_sid: str) -> str:
+    return _abs(request, f"/voice/menu/{menu.id}/review/?{urlencode({'recording': recording_sid})}")
+
+
 def _business_for_dialed_number(db: Session, dialed: str) -> IVRConfig | None:
     dialed_digits = _digits_only(dialed)
     if not dialed_digits:
@@ -105,21 +119,42 @@ def _business_for_dialed_number(db: Session, dialed: str) -> IVRConfig | None:
 @router.api_route("/voice/incoming/", methods=["GET", "POST"])
 async def incoming_call(request: Request, db: Session = Depends(get_db)):
     params = await _params(request)
-    dialed = ""
-    for key in ("To", "Called", "CalledNumber", "DNIS", "Destination", "to", "did", "number"):
-        dialed = _param(params, key)
-        if dialed:
-            break
+    dialed = _dialed_number(params)
 
     config = _business_for_dialed_number(db, dialed)
     if config:
-        log_call(db, config.owner_id, to_number=dialed, from_number=_caller_number(params))
+        log_call(
+            db, config.owner_id, to_number=dialed, from_number=_caller_number(params),
+            call_sid=_param(params, "CallSid"),
+        )
         root = db.query(Menu).filter(Menu.owner_id == config.owner_id, Menu.parent_id.is_(None)).first()
         if root:
             return _xml(_render_menu(request, root))
         return _xml(flexml.say("This number has no menu set up yet. Goodbye."))
 
     return _xml(flexml.gather_access_code(_abs(request, "/voice/access-code/")))
+
+
+# Statuses CarrierX may report while the call is still going on.
+_CALL_IN_PROGRESS = {"queued", "initiated", "ringing", "in-progress", "answered"}
+
+
+@router.api_route("/voice/status/", methods=["GET", "POST"])
+async def call_status(request: Request, db: Session = Depends(get_db)):
+    """Status callback: CarrierX hits this when a call ends, so we can store its length."""
+    params = await _params(request)
+    if _param(params, "CallStatus").lower() in _CALL_IN_PROGRESS:
+        return Response(status_code=204)
+    duration = None
+    for key in ("CallDuration", "Duration", "DialCallDuration"):
+        if _param(params, key).isdigit():
+            duration = int(_param(params, key))
+            break
+    finish_call(
+        db, call_sid=_param(params, "CallSid"), to_number=_dialed_number(params),
+        from_number=_caller_number(params), duration=duration,
+    )
+    return Response(status_code=204)
 
 
 @router.api_route("/voice/access-code/", methods=["GET", "POST"])
@@ -157,10 +192,19 @@ async def menu_record(request: Request, pk: int, db: Session = Depends(get_db)):
     if not menu:
         return _xml(flexml.say("Menu not found. Goodbye."))
     params = await _params(request)
+    recording = _param(params, "RecordingSid")
+    duration = _param(params, "RecordingDuration")
+    if not recording:
+        return _xml(flexml.say("We did not receive your message. Goodbye."))
+    review = _xml(flexml.review_menu(_review_url(request, menu, recording)))
+    # recording_sid is unique: a repeated webhook for the same recording is a no-op.
+    if db.query(VoiceMessage).filter(VoiceMessage.recording_sid == recording).first():
+        return review
     db.add(VoiceMessage(
         menu_id=menu.id,
         caller_number=_caller_number(params),
-        recording_sid=_param(params, "RecordingUrl"),
+        recording_sid=recording,
+        duration=duration,
     ))
     db.commit()
 
@@ -173,7 +217,35 @@ async def menu_record(request: Request, pk: int, db: Session = Depends(get_db)):
         except Exception as e:
             print(f"Voicemail email failed: {e}")
 
-    return _xml(flexml.say("Your message has been recorded. Goodbye."))
+    # Saved already, so a caller who just hangs up here still leaves the message.
+    return review
+
+
+@router.api_route("/voice/menu/{pk}/review/", methods=["GET", "POST"])
+async def menu_review(request: Request, pk: int, db: Session = Depends(get_db)):
+    menu = db.query(Menu).filter(Menu.id == pk).first()
+    if not menu:
+        return _xml(flexml.say("Menu not found. Goodbye."))
+    params = await _params(request)
+    digit = _param(params, "Digits")
+    recording = _param(params, "recording")
+
+    if digit == "1" and recording:
+        play_url = _abs(request, f"/voice/play/{quote(recording, safe='')}/")
+        return _xml(flexml.review_menu(_review_url(request, menu, recording), play_url))
+    if digit == "2":
+        vm = db.query(VoiceMessage).filter(
+            VoiceMessage.recording_sid == recording, VoiceMessage.menu_id == menu.id
+        ).first()
+        if vm:
+            delete_from_carrierx(vm.recording_sid)
+            db.delete(vm)
+            db.commit()
+        return _xml(flexml.record(
+            None, _abs(request, f"/voice/menu/{menu.id}/record/"),
+            say_text="Your message was deleted. Please record your new message after the tone.",
+        ))
+    return _xml(flexml.say("Your message has been saved. Goodbye."))
 
 
 @router.api_route("/voice/play/{file_sid}/", methods=["GET", "HEAD"])

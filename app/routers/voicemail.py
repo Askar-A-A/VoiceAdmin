@@ -60,6 +60,9 @@ def voicemail_stream(pk: int, user: User = Depends(require_user), db: Session = 
     
     vm = _get_message(db, pk, user)
 
+    vm.is_new = False
+    db.commit()
+
     if settings.TESTING:
         return FileResponse(path = "app/static/test/o-privet.mp3", media_type = "audio/mpeg" )
     else:

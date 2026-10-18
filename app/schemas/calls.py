@@ -19,7 +19,6 @@ class CallLogOut(BaseModel):
     location_city: str
     ip_address: str | None
     duration_seconds: int
-    status: str
     created_at: datetime
 
 
