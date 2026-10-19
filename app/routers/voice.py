@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request, Depends
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_db
 from app.models.ivr import Menu, IVRConfig, PLAYBACK_AND_RECORD, DIAL_OUT
 from app.models.voicemail import VoiceMessage
@@ -97,9 +98,20 @@ def _render_menu(request: Request, menu: Menu) -> str:
     if menu.menu_type == DIAL_OUT and menu.dial_out_number:
         return flexml.dial(menu.dial_out_number)
     if menu.menu_type == PLAYBACK_AND_RECORD:
-        return flexml.record(play_url, _abs(request, f"/voice/menu/{menu.id}/record/"))
+        return _record_xml(request, menu, play_url)
     # Always gather so pressing 0 can return to the parent, even on leaf nodes.
     return flexml.play_and_gather(play_url, _abs(request, f"/voice/menu/{menu.id}/"))
+
+
+def _record_xml(request: Request, menu: Menu, play_url: str | None = None, say_text: str | None = None) -> str:
+    """<Record> wired up for storage (containerSid) and post-call data (callbackUrl)."""
+    return flexml.record(
+        play_url,
+        _abs(request, f"/voice/menu/{menu.id}/record/"),
+        say_text=say_text,
+        container_sid=settings.CARRIERX_CONTAINER_SID,
+        callback_url=_abs(request, f"/voice/menu/{menu.id}/recording-saved/"),
+    )
 
 
 def _review_url(request: Request, menu: Menu, recording_sid: str) -> str:
@@ -197,28 +209,45 @@ async def menu_record(request: Request, pk: int, db: Session = Depends(get_db)):
     if not recording:
         return _xml(flexml.say("We did not receive your message. Goodbye."))
     review = _xml(flexml.review_menu(_review_url(request, menu, recording)))
-    # recording_sid is unique: a repeated webhook for the same recording is a no-op.
+    _save_voicemail(db, menu, recording, _caller_number(params), duration)
+    # Saved already, so a caller who just hangs up here still leaves the message.
+    return review
+
+
+def _save_voicemail(db: Session, menu: Menu, recording: str, caller: str, duration: str = "") -> None:
+    """Store a message and email the owner. No-op if this recording is already saved
+    (`recording_sid` is unique, and both `action` and `callbackUrl` can report it)."""
     if db.query(VoiceMessage).filter(VoiceMessage.recording_sid == recording).first():
-        return review
+        return
     db.add(VoiceMessage(
-        menu_id=menu.id,
-        caller_number=_caller_number(params),
-        recording_sid=recording,
-        duration=duration,
+        menu_id=menu.id, caller_number=caller, recording_sid=recording, duration=duration,
     ))
     db.commit()
 
     user = db.query(User).filter(User.id == menu.owner_id).first()
-
     # Email is best-effort: a failed/flaky SMTP must never break the call flow.
     if user and user.email_notifications_enabled:
         try:
-            send_voicemail_notifications(to_email=user.email, caller_number=_caller_number(params))
+            send_voicemail_notifications(to_email=user.email, caller_number=caller)
         except Exception as e:
             print(f"Voicemail email failed: {e}")
 
-    # Saved already, so a caller who just hangs up here still leaves the message.
-    return review
+
+@router.api_route("/voice/menu/{pk}/recording-saved/", methods=["GET", "POST"])
+async def menu_recording_saved(request: Request, pk: int, db: Session = Depends(get_db)):
+    """CarrierX `callbackUrl`: recording data sent after the call ends.
+
+    Catches callers who hang up mid-recording (then `action` is never requested).
+    """
+    params = await _params(request)
+    print("RECORDING CALLBACK:", {k: params[k] for k in params if k.startswith("Recording") or k == "CallSid"})
+    menu = db.query(Menu).filter(Menu.id == pk).first()
+    recording = _param(params, "RecordingFileSid") or _param(params, "RecordingSid")
+    if menu and recording and _param(params, "RecordingStatus").lower() != "absent":
+        _save_voicemail(
+            db, menu, recording, _caller_number(params), _param(params, "RecordingDuration"),
+        )
+    return Response(status_code=204)
 
 
 @router.api_route("/voice/menu/{pk}/review/", methods=["GET", "POST"])
@@ -241,8 +270,8 @@ async def menu_review(request: Request, pk: int, db: Session = Depends(get_db)):
             delete_from_carrierx(vm.recording_sid)
             db.delete(vm)
             db.commit()
-        return _xml(flexml.record(
-            None, _abs(request, f"/voice/menu/{menu.id}/record/"),
+        return _xml(_record_xml(
+            request, menu,
             say_text="Your message was deleted. Please record your new message after the tone.",
         ))
     return _xml(flexml.say("Your message has been saved. Goodbye."))

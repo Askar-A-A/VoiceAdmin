@@ -38,11 +38,31 @@ def dial(number: str) -> str:
     return _document(f'<Dial>{escape(number)}</Dial>')
 
 
-def record(play_url: str | None, action_url: str, max_length: int = 120, say_text: str | None = None) -> str:
+def record(
+    play_url: str | None,
+    action_url: str,
+    max_length: int = 120,
+    say_text: str | None = None,
+    container_sid: str | None = None,
+    callback_url: str | None = None,
+) -> str:
+    """CarrierX FlexML <Record>.
+
+    Unlike TwiML, CarrierX saves nothing unless the recording has a storage
+    container (`containerSid`). `action` returns the next instructions once the
+    recording ends; `callbackUrl` receives the recording data after the call ends
+    (RecordingFileSid, RecordingUrl, ...) — it is what catches callers who hang up
+    mid-recording, when `action` is never requested.
+    """
     inner = f'<Play>{escape(play_url)}</Play>' if play_url else ''
     if say_text:
         inner += f'<Say>{escape(say_text)}</Say>'
-    inner += f'<Record action={quoteattr(action_url)} method="POST" maxLength="{max_length}"/>'
+    attrs = f'action={quoteattr(action_url)} method="POST" maxLength="{max_length}" playBeep="true"'
+    if container_sid:
+        attrs += f' containerSid={quoteattr(container_sid)}'
+    if callback_url:
+        attrs += f' callbackUrl={quoteattr(callback_url)}'
+    inner += f'<Record {attrs}></Record>'
     return _document(inner)
 
 
