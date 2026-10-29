@@ -93,14 +93,31 @@ def _play_url(request: Request, menu: Menu) -> str | None:
     return _abs(request, f"/voice/play/{menu.greeting.file_sid}/")
 
 
-def _render_menu(request: Request, menu: Menu) -> str:
+# A prompt nobody answers is played again instead of hanging up, but not forever:
+# after this many unanswered plays in a row the call ends politely.
+MAX_SILENT = 3
+
+
+def _silent(params: dict) -> int:
+    """How many prompts in a row went unanswered so far (carried in the URL as ?silent=N)."""
+    value = _param(params, "silent")
+    return int(value) if value.isdigit() else 0
+
+
+def _retry(url: str, silent: int) -> str:
+    """Where the call goes when the prompt times out: the same step, one silence later."""
+    return f"{url}?silent={silent + 1}"
+
+
+def _render_menu(request: Request, menu: Menu, silent: int = 0) -> str:
     play_url = _play_url(request, menu)
     if menu.menu_type == DIAL_OUT and menu.dial_out_number:
         return flexml.dial(menu.dial_out_number)
     if menu.menu_type == PLAYBACK_AND_RECORD:
         return _record_xml(request, menu, play_url)
     # Always gather so pressing 0 can return to the parent, even on leaf nodes.
-    return flexml.play_and_gather(play_url, _abs(request, f"/voice/menu/{menu.id}/"))
+    action = _abs(request, f"/voice/menu/{menu.id}/")
+    return flexml.play_and_gather(play_url, action, retry_url=_retry(action, silent))
 
 
 def _record_xml(request: Request, menu: Menu, play_url: str | None = None, say_text: str | None = None) -> str:
@@ -144,7 +161,8 @@ async def incoming_call(request: Request, db: Session = Depends(get_db)):
             return _xml(_render_menu(request, root))
         return _xml(flexml.say("This number has no menu set up yet. Goodbye."))
 
-    return _xml(flexml.gather_access_code(_abs(request, "/voice/access-code/")))
+    code_url = _abs(request, "/voice/access-code/")
+    return _xml(flexml.gather_access_code(code_url, retry_url=_retry(code_url, 0)))
 
 
 # Statuses CarrierX may report while the call is still going on.
@@ -173,6 +191,12 @@ async def call_status(request: Request, db: Session = Depends(get_db)):
 async def access_code(request: Request, db: Session = Depends(get_db)):
     params = await _params(request)
     digits = _param(params, "Digits")
+    if not digits:  # nothing typed: ask again a few times instead of hanging up
+        silent = _silent(params)
+        if silent >= MAX_SILENT:
+            return _xml(flexml.say("We did not receive your code. Goodbye."))
+        code_url = _abs(request, "/voice/access-code/")
+        return _xml(flexml.gather_access_code(code_url, retry_url=_retry(code_url, silent)))
     config = db.query(IVRConfig).filter(IVRConfig.access_code == digits).first()
     if not config:
         return _xml(flexml.say("That access code was not recognized. Goodbye."))
@@ -190,11 +214,24 @@ async def menu_input(request: Request, pk: int, db: Session = Depends(get_db)):
     params = await _params(request)
     digit = _param(params, "Digits")
 
+    if not digit:  # the caller was silent: play the menu again, a few times, then say goodbye
+        silent = _silent(params)
+        if silent >= MAX_SILENT:
+            return _xml(flexml.say("We did not hear a response. Goodbye."))
+        return _xml(_render_menu(request, menu, silent=silent))
+
     child = db.query(Menu).filter(Menu.parent_id == menu.id, Menu.key == digit).first()
     if child:
         return _xml(_render_menu(request, child))
     if digit == "0" and menu.parent:
         return _xml(_render_menu(request, menu.parent))
+    if digit == "*" and menu.parent_id is None:
+        # Owner access by phone: * on the main menu asks for the PIN.
+        pin_url = _abs(request, f"/voice/admin/{menu.id}/pin/")
+        return _xml(flexml.gather_pin(
+            pin_url, "Owner access. Please enter your PIN, followed by pound.",
+            retry_url=_retry(pin_url, 0),
+        ))
     return _xml(_render_menu(request, menu))
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
-    String, DateTime, ForeignKey, UniqueConstraint, func,
+    String, DateTime, ForeignKey, Index, UniqueConstraint, func, text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,12 +20,18 @@ MENU_TYPE_LABELS = {
 
 
 class IVRConfig(Base):
+    
     """Per-customer telephony settings.
 
     Callers reach a customer's menu by entering `access_code` on the shared
     number; `phone_number` is the future dedicated-number tier.
     """
     __tablename__ = "ivr_configs"
+    __table_args__ = (
+        # Two customers can never hold the same number ('' = no number yet).
+        Index("uq_ivr_phone_number", "phone_number", unique=True,
+              postgresql_where=text("phone_number <> ''")),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     owner_id: Mapped[int] = mapped_column(

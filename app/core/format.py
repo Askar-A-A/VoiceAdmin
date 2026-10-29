@@ -17,6 +17,14 @@ def filesizeformat(value) -> str:
     return f"{size:.1f} TB"
 
 
+def phone(value) -> str:
+    """'14849687622' -> '+1 484-968-7622'. Anything else is returned untouched."""
+    digits = "".join(ch for ch in str(value or "") if ch.isdigit())
+    if len(digits) == 11 and digits.startswith("1"):
+        return f"+1 {digits[1:4]}-{digits[4:7]}-{digits[7:]}"
+    return str(value or "")
+
+
 def fmt_dt(value) -> str:
     """Format a datetime like Django's 'M j, Y, g:i a' -> 'Jan 5, 2026, 3:04 p.m.'."""
     if not isinstance(value, datetime):

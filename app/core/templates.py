@@ -3,7 +3,8 @@ import secrets
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
 
-from app.core.format import filesizeformat, fmt_dt
+from app.core.config import settings
+from app.core.format import filesizeformat, fmt_dt, phone
 from app.models.ivr import MENU_TYPE_LABELS
 
 
@@ -50,6 +51,10 @@ templates = _Templates(
 )
 templates.env.filters["filesizeformat"] = filesizeformat
 templates.env.filters["fmt_dt"] = fmt_dt
+templates.env.filters["phone"] = phone
+# True once Stripe keys are configured (Upgrade then goes to the payment page).
+templates.env.globals["billing_enabled"] = settings.billing_enabled
+templates.env.globals["free_upgrade_allowed"] = settings.ALLOW_FREE_UPGRADE and not settings.billing_enabled
 templates.env.globals["menu_type_label"] = lambda t: MENU_TYPE_LABELS.get(t, t)
 
 

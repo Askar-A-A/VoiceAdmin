@@ -3,8 +3,9 @@
 {% block content %}
 <h1 class="h4 mb-4">Account settings</h1>
 
+{# Two stacked columns, not one grid: cards of different heights then pack tightly with no gaps. #}
 <div class="row g-4">
-  <div class="col-lg-6">
+  <div class="col-lg-6 d-flex flex-column gap-4">
     <div class="card">
       <div class="card-body">
         <h2 class="h6">Profile</h2>
@@ -19,25 +20,7 @@
         </form>
       </div>
     </div>
-  </div>
 
-  <div class="col-lg-6">
-    <div class="card">
-      <div class="card-body">
-        <h2 class="h6">Change password</h2>
-        <form method="post" action="/accounts/settings/">
-          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-          <input type="hidden" name="action" value="change_password">
-          <input class="form-control mb-2" type="password" name="current_password" placeholder="Current password" required>
-          <input class="form-control mb-2" type="password" name="new_password" placeholder="New password" required>
-          <input class="form-control mb-3" type="password" name="confirm_password" placeholder="Confirm new password" required>
-          <button class="btn btn-primary btn-sm">Change password</button>
-        </form>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-lg-6">
     <div class="card">
       <div class="card-body">
         <h2 class="h6">Notifications</h2>
@@ -53,6 +36,71 @@
             </label>
           </div>
           <button class="btn btn-primary btn-sm">Save notifications</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6">Plan</h2>
+        {% if user.plan == 'private' %}
+        <p class="mb-2"><span class="badge text-bg-primary">Private</span> Your own dedicated phone number, no access code.</p>
+        <div class="d-flex flex-wrap gap-2">
+          {% if billing_enabled and user.stripe_customer_id %}
+          <form method="post" action="/billing/portal/">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-outline-primary btn-sm">Manage billing</button>
+          </form>
+          {% endif %}
+          <form method="post" action="/accounts/plan/downgrade/"
+                onsubmit="return confirm('Switch to the Free plan? Your private number will be released and your subscription cancelled.')">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="btn btn-outline-secondary btn-sm">Switch to Free</button>
+          </form>
+        </div>
+        {% else %}
+        <p class="mb-2"><span class="badge text-bg-secondary">Free</span> Shared phone number with an access code.</p>
+        <form method="post" action="{{ '/billing/checkout/' if billing_enabled else '/accounts/plan/upgrade/' }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="next" value="/accounts/settings/">
+          <button class="btn btn-primary btn-sm">Upgrade to Private</button>
+          {% if free_upgrade_allowed %}<div class="form-text">Dev mode: free upgrade, no payment.</div>{% endif %}
+        </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6 d-flex flex-column gap-4">
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6">Change password</h2>
+        <form method="post" action="/accounts/settings/">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="change_password">
+          <input class="form-control mb-2" type="password" name="current_password" placeholder="Current password" required>
+          <input class="form-control mb-2" type="password" name="new_password" placeholder="New password" required>
+          <input class="form-control mb-3" type="password" name="confirm_password" placeholder="Confirm new password" required>
+          <button class="btn btn-primary btn-sm">Change password</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <h2 class="h6">Phone PIN {% if user.phone_pin_hash %}<span class="badge text-bg-success">set</span>{% else %}<span class="badge text-bg-secondary">not set</span>{% endif %}</h2>
+        <p class="small text-muted mb-2">
+          Manage your messages by phone: dial your number, press <strong>*</strong> during the main greeting
+          (on the shared number, enter your access code first), then enter this PIN followed by <strong>#</strong>.
+        </p>
+        <form method="post" action="/accounts/settings/">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="action" value="update_pin">
+          <input class="form-control mb-2" type="password" name="pin" inputmode="numeric" pattern="[0-9]{4,8}"
+                 placeholder="New PIN (4 to 8 digits)" required>
+          <input class="form-control mb-3" type="password" name="confirm_pin" inputmode="numeric" pattern="[0-9]{4,8}"
+                 placeholder="Repeat PIN" required>
+          <button class="btn btn-primary btn-sm">Save PIN</button>
         </form>
       </div>
     </div>

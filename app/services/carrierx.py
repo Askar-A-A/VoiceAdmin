@@ -47,6 +47,29 @@ def delete_from_carrierx(file_sid: str) -> bool:
     return response.status_code in (200, 204)
 
 
+def list_dids() -> list[dict]:
+    """Every number rented on the account as {number, did_sid, label}; [] on failure."""
+    try:
+        response = requests.get(DIDS, headers=_auth_headers(), timeout=10)
+    except requests.RequestException:
+        return []
+    if response.status_code != 200:
+        return []
+
+    data = response.json()
+    items = data.get("items", []) if isinstance(data, dict) else data
+    dids = []
+    for item in items:
+        number = item.get("phonenumber") or item.get("did") or item.get("number")
+        if number:
+            dids.append({
+                "number": number,
+                "did_sid": item.get("did_sid") or "",
+                "label": item.get("name") or "",
+            })
+    return dids
+
+
 def list_phone_numbers() -> list[str]:
     """Phone numbers (DIDs) rented on the account; empty list on any failure."""
     try:

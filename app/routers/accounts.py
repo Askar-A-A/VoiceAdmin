@@ -8,8 +8,10 @@ from app.core.security import (
 )
 from app.core.templates import templates, flash
 from app.db.session import get_db
-from app.models.user import User
+from app.core.config import settings
+from app.models.user import User, PLAN_PRIVATE
 from app.models.audio import AudioFile
+from app.services import billing
 
 router = APIRouter()
 
@@ -99,6 +101,8 @@ def settings_submit(
     email: str = Form(""),
     name: str = Form(""),
     email_notifications_enabled: str = Form(""),
+    pin: str = Form(""),
+    confirm_pin: str = Form(""),
     current_password: str = Form(""),
     new_password: str = Form(""),
     confirm_password: str = Form(""),
@@ -127,6 +131,18 @@ def settings_submit(
             db.commit()
             flash(request, "Password changed.")
             return RedirectResponse("/accounts/settings/", status_code=303)
+    elif action == "update_pin":
+        if not (pin.isdigit() and 4 <= len(pin) <= 8):
+            errors.append("The PIN must be 4 to 8 digits.")
+        elif pin != confirm_pin:
+            errors.append("The PINs do not match.")
+        else:
+            user.phone_pin_hash = hash_password(pin)
+            user.pin_failed_attempts = 0
+            user.pin_locked_until = None
+            db.commit()
+            flash(request, "Phone PIN saved.")
+            return RedirectResponse("/accounts/settings/", status_code=303)
     elif action == "update_notifications":
         user.email_notifications_enabled = email_notifications_enabled == "on"
         db.commit()
@@ -138,6 +154,44 @@ def settings_submit(
         "accounts/settings.html",
         {"request": request, "user": user, "errors": errors, **_stats(db, user)},
     )
+
+
+@router.post("/accounts/plan/upgrade/")
+def plan_upgrade(
+    request: Request,
+    next: str = Form("/accounts/settings/"),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    target = next if next in ("/accounts/settings/", "/phone-menu/") else "/accounts/settings/"
+    if user.plan == PLAN_PRIVATE:
+        flash(request, "You are already on the Private plan.")
+    elif settings.billing_enabled:
+        # Payments are on: the plan is only granted after Stripe confirms the payment.
+        flash(request, "Please upgrade through the payment page.", "danger")
+    elif settings.ALLOW_FREE_UPGRADE:
+        # Explicit dev switch only: no payment provider, plan granted instantly.
+        user.plan = PLAN_PRIVATE
+        db.commit()
+        flash(request, "You are now on the Private plan (free upgrade is enabled for development).")
+    else:
+        flash(request, "Payments are not set up yet, so the Private plan can't be bought right now.", "danger")
+    return RedirectResponse(target, status_code=303)
+
+
+@router.post("/accounts/plan/downgrade/")
+def plan_downgrade(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    # Stop the subscription first, otherwise the customer would keep being charged.
+    if user.stripe_subscription_id and settings.billing_enabled:
+        try:
+            billing.cancel_subscription(user.stripe_subscription_id)
+        except Exception as e:
+            print(f"Stripe cancel failed: {e}")
+            flash(request, "Could not cancel the subscription. Please try again.", "danger")
+            return RedirectResponse("/accounts/settings/", status_code=303)
+    billing.deactivate_to_free(db, user)  # the private number goes back to the pool
+    flash(request, "You are now on the Free plan. Your private number was released.")
+    return RedirectResponse("/accounts/settings/", status_code=303)
 
 
 def _stats(db: Session, user: User) -> dict:

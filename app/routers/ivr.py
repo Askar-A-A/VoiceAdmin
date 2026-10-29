@@ -7,12 +7,13 @@ from sqlalchemy.orm import Session
 from app.core.security import require_user
 from app.core.templates import templates, flash
 from app.db.session import get_db
-from app.models.user import User
+from app.core.config import settings
+from app.models.user import User, PLAN_PRIVATE
 from app.models.audio import AudioFile
 from app.models.ivr import (
     Menu, IVRConfig, PLAYBACK_ONLY, PLAYBACK_AND_RECORD, DIAL_OUT, MENU_TYPE_LABELS,
 )
-from app.services.carrierx import list_phone_numbers
+from app.services.numbers import assign_number, release_number
 
 router = APIRouter()
 
@@ -59,16 +60,30 @@ def ivr_builder(request: Request, user: User = Depends(require_user), db: Sessio
     config = _get_config(db, user)
     return templates.TemplateResponse("ivr/builder.html", {
         "request": request, "user": user,
-        "root": root, "config": config, "numbers": list_phone_numbers(),
+        "root": root, "config": config,
+        "shared_number": settings.SHARED_NUMBER,
     })
 
 
-@router.post("/phone-menu/phone-number/")
-def set_phone_number(request: Request, phone_number: str = Form(""), user: User = Depends(require_user), db: Session = Depends(get_db)):
+@router.post("/phone-menu/get-number/")
+def get_number(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
     config = _get_config(db, user)
-    config.phone_number = (phone_number or "").strip()
-    db.commit()
-    flash(request, "Phone number saved.")
+    if user.plan != PLAN_PRIVATE:
+        flash(request, "A private number is part of the Private plan.", "danger")
+    elif config.phone_number:
+        flash(request, "You already have a phone number.", "danger")
+    elif assign_number(db, config):
+        flash(request, "Your private number is ready. Callers who dial it reach your menu directly.")
+    else:
+        flash(request, "No numbers are available right now. Please try again later.", "danger")
+    return RedirectResponse("/phone-menu/", status_code=303)
+
+
+@router.post("/phone-menu/release-number/")
+def release_my_number(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    config = _get_config(db, user)
+    release_number(db, config)
+    flash(request, "Your number was released.")
     return RedirectResponse("/phone-menu/", status_code=303)
 
 
@@ -94,6 +109,10 @@ def _validate(db, user, *, name, key, menu_type, dial_out_number, parent_id, is_
             clash = clash.filter(Menu.id != exclude_id)
         if clash.first():
             errors["key"] = f'Key "{key}" is already used in this menu.'
+    if not is_root and key == "*":
+        parent = db.get(Menu, parent_id)
+        if parent is not None and parent.parent_id is None:
+            errors["key"] = "The * key on the main menu is reserved for owner access by phone."
     if menu_type == DIAL_OUT and not dial_out_number.strip():
         errors["dial_out_number"] = "A phone number is required for dial-out menus."
     return errors

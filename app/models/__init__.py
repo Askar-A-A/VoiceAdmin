@@ -5,8 +5,10 @@ from app.models.ivr import IVRConfig, Menu
 from app.models.calls import Call, CallLog
 from app.models.voicemail import VoiceMessage
 from app.models.conference import Conference
+from app.models.phone_number import PhoneNumber
 
 __all__ = [
+    "PhoneNumber",
     "User",
     "Folder",
     "AudioFile",

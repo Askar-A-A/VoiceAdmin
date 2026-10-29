@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.core.config import settings
 from app.core.security import NotAuthenticated
 from app.core.csrf import verify_csrf
-from app.routers import accounts, dashboard, audio, ivr, voice, calls, voicemail, conference
+from app.routers import accounts, dashboard, audio, ivr, voice, voice_admin, calls, voicemail, conference, billing
 
 app = FastAPI(title="VoicePortal")
 
@@ -27,10 +27,13 @@ app.include_router(audio.router, dependencies=csrf)
 app.include_router(ivr.router, dependencies=csrf)
 app.include_router(voicemail.router, dependencies=csrf)
 app.include_router(conference.router, dependencies=csrf)
+app.include_router(billing.router, dependencies=csrf)
 
-# No CSRF: dashboard is read-only; voice/calls are public provider webhooks.
+# No CSRF: dashboard is read-only; voice/calls/Stripe are public provider webhooks.
+app.include_router(billing.webhook_router)
 app.include_router(dashboard.router)
 app.include_router(voice.router)
+app.include_router(voice_admin.router)
 app.include_router(calls.router)
 
 
